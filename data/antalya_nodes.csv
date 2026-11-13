@@ -1,0 +1,25 @@
+node_id,name,district,lat,lon,safe_intersection_name,urban_density,vulnerability_weight,population_weight,elevation_m
+muratpasa_meltem,Meltem,Muratpaşa,36.886,30.665,Meltem Blvd & Tarik Akiltopu St,0.85,0.55,0.0499,35.0
+muratpasa_kaleici,Kaleiçi,Muratpaşa,36.8835,30.7055,Hadrians Gate & Ataturk Ave,0.78,0.6,0.0297,28.0
+muratpasa_muratpasa,Muratpaşa,Muratpaşa,36.892,30.701,Gulluk Ave & Sarampol St,0.9,0.65,0.046,38.0
+muratpasa_kiziltoprak,Kızıltoprak,Muratpaşa,36.894,30.725,Mevlana Junction & Ali Cetinkaya Ave,0.88,0.7,0.0479,42.0
+muratpasa_genclik,Gençlik,Muratpaşa,36.877,30.713,Isiklar Ave & Karaalioglu Park Entrance,0.75,0.45,0.0364,32.0
+muratpasa_sirinyali,Şirinyalı,Muratpaşa,36.866,30.732,Ismet Goksen Ave & Sinanoglu St,0.72,0.4,0.0431,36.0
+muratpasa_fener,Fener,Muratpaşa,36.853,30.756,Bulent Ecevit Blvd & Fener Ave,0.7,0.42,0.0402,38.0
+muratpasa_guzeloba,Güzeloba,Muratpaşa,36.858,30.783,Havaalani Ave & Rauf Denktas Blvd,0.62,0.48,0.0421,45.0
+kepez_kultur,Kültür,Kepez,36.901,30.658,Kafeler St & Dumlupinar Blvd,0.88,0.58,0.0441,52.0
+kepez_ahatli,Ahatlı,Kepez,36.911,30.652,Ulusoy Ave & 3165 St,0.82,0.62,0.0393,65.0
+kepez_fabrikalar,Fabrikalar,Kepez,36.91,30.676,Namik Kemal Blvd & Fikri Erten Ave,0.85,0.6,0.0412,58.0
+kepez_dokuma,Dokuma (Özgürlük),Kepez,36.918,30.68,Dokumapark & Mehmet Akif Ave,0.92,0.75,0.0527,68.0
+kepez_yesilyurt,Yeşilyurt,Kepez,36.904,30.672,Antalya Blvd & 4301 St,0.86,0.68,0.045,55.0
+kepez_teomanpasa,Teomanpaşa,Kepez,36.917,30.71,Yesilirmak Ave & Necip Fazil St,0.9,0.8,0.0498,62.0
+kepez_kuzeyyaka,Kuzeyyaka,Kepez,36.925,30.716,Gazi Blvd & Goksu Ave,0.88,0.78,0.0469,72.0
+kepez_goksu,Göksu,Kepez,36.912,30.738,Altinova Blvd & Serik Ave,0.65,0.55,0.0345,50.0
+kepez_varsak,Varsak Karşıyaka,Kepez,36.962,30.715,Suleyman Demirel Blvd & Varsak Oval,0.75,0.72,0.0431,110.0
+kepez_sutculer,Sütçüler,Kepez,36.936,30.728,Kepez State Hospital Junction & Sutculer Ave,0.82,0.76,0.046,85.0
+konyaalti_arapsuyu,Arapsuyu,Konyaaltı,36.879,30.648,Akdeniz Blvd & Ataturk Culture Park Entrance,0.7,0.35,0.0364,15.0
+konyaalti_altinkum,Altınkum,Konyaaltı,36.872,30.635,Gazi Mustafa Kemal Blvd & Akdeniz Blvd,0.74,0.38,0.0402,12.0
+konyaalti_kuskavagi,Kuşkavağı,Konyaaltı,36.868,30.622,Bogacayi Ave & Akdeniz Blvd,0.68,0.32,0.0335,10.0
+konyaalti_liman,Liman,Konyaaltı,36.852,30.608,Bogacayi Bridge & Liman Ave,0.72,0.36,0.0383,8.0
+konyaalti_gursu,Gürsu,Konyaaltı,36.864,30.63,Ataturk Blvd & 304 St,0.69,0.34,0.0354,14.0
+konyaalti_toros,Toros,Konyaaltı,36.888,30.638,Anadolu Ave & Uncali St,0.76,0.42,0.0383,35.0

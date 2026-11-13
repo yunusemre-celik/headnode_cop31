@@ -63,8 +63,8 @@ class HeatnodePipeline:
             coords = np.array(
                 [
                     [
-                        float(rep.get("lat", self.graph.nodes[rep["node_id"]]["lat"])),
-                        float(rep.get("lon", self.graph.nodes[rep["node_id"]]["lon"])),
+                        self.graph.nodes[rep["node_id"]]["lat"],
+                        self.graph.nodes[rep["node_id"]]["lon"],
                     ]
                     for rep in valid_reports
                 ],
@@ -84,7 +84,7 @@ class HeatnodePipeline:
             has_reports = report_counts[nid] > 0
             in_cluster = cluster_counts[nid] > 0
             iso_flagged = int(iso_preds[idx]) == -1
-            verified_by_node[nid] = bool(has_reports and in_cluster and (iso_flagged or cluster_counts[nid] >= 10))
+            verified_by_node[nid] = bool(has_reports and in_cluster and iso_flagged)
 
         return report_counts, verified_by_node
 

@@ -1,0 +1,7 @@
+{
+  "temperature_c": 36.4,
+  "relative_humidity": 48.0,
+  "wind_speed_kmh": 12.5,
+  "wind_direction_deg": 215.0,
+  "solar_radiation_wm2": 780.0
+}

@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/$/, "");
 const BROWSER_ID_KEY = "heatnode_browser_id";
 
 function getStoredBrowserId() {
@@ -202,4 +202,15 @@ export function subscribeDemoAuthorityStream({ limit, onData, onError } = {}) {
     onData,
     onError,
   });
+}
+
+export async function toggleSafezone(nodeId, isActive) {
+  const options = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  };
+  if (typeof isActive === "boolean") {
+    options.body = JSON.stringify({ is_active: isActive });
+  }
+  return apiFetch(`/api/safezones/${encodeURIComponent(nodeId)}/toggle`, options);
 }

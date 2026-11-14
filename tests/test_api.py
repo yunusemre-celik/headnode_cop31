@@ -1,101 +1,190 @@
-"""API & SQLite Persistence Tests for HEATNODE AI."""
+"""API contract and decision model adapter tests for COP31 Heatnode."""
 
-import sqlite3
+from __future__ import annotations
+
+import json
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
+import pytest
 
-from backend.main import create_app
+from backend.decision_model import (
+    DecisionModelInput,
+    evaluate_decision_model,
+)
+from backend.models import DisasterType, MapQueryResponse
 
-
-def test_health_and_baseline_state(tmp_path):
-    app = create_app(db_path=str(tmp_path / "test.db"), force_fallback_weather=True)
-    client = TestClient(app)
-
-    health = client.get("/health")
-    assert health.status_code == 200
-    assert health.json()["status"] == "ok"
-
-    state_res = client.get("/state")
-    assert state_res.status_code == 200
-    state = state_res.json()
-    assert state["alert_state"]["status"] == "MONITORING"
-    assert state["public_alert_active"] is False
-    assert len(state["node_states"]) == 24
-    assert "weather" in state
-    assert "propagation_edges" in state
-    assert "hubs" in state
-    assert "nearest_hub_by_node" in state
+LAT = 36.8969
+LNG = 30.7133
 
 
-def test_invalid_report_returns_422(tmp_path):
-    app = create_app(db_path=str(tmp_path / "test.db"), force_fallback_weather=True)
-    client = TestClient(app)
-
-    res = client.post("/report", json={"node_id": "INVALID_NODE", "category": "extreme_heat"})
-    assert res.status_code == 422
-
-    bad_cat = client.post("/report", json={"node_id": "kepez_dokuma", "category": "invalid_category"})
-    assert bad_cat.status_code == 422
+def test_health_endpoint(client: TestClient) -> None:
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "cop31-heatnode"
+    assert body["model_version"] == "rule-v1"
 
 
-def test_valid_report_and_zero_pii_schema(tmp_path):
-    db_file = tmp_path / "test.db"
-    app = create_app(db_path=str(db_file), force_fallback_weather=True)
-    client = TestClient(app)
+def test_session_issues_httponly_cookie_and_honors_header(client: TestClient) -> None:
+    s1 = client.post("/api/session")
+    assert s1.status_code == 200
+    bid1 = s1.json()["browser_id"]
+    UUID(bid1)  # valid UUID
+    set_cookie = s1.headers.get("set-cookie", "")
+    assert "heatnode_browser_id=" in set_cookie
+    assert "httponly" in set_cookie.lower()
 
-    res = client.post("/report", json={"node_id": "kepez_dokuma", "category": "extreme_heat"})
-    assert res.status_code == 200
-    body = res.json()
-    assert body["accepted"] is True
-    assert body["node_id"] == "kepez_dokuma"
-    assert body["alert_status"] == "MONITORING"
-    assert body["public_alert_active"] is False
-    assert body["nearest_hub"] is None
+    # Subsequent call with cookie reuses the same browser_id
+    s2 = client.post("/api/session")
+    assert s2.status_code == 200
+    assert s2.json()["browser_id"] == bid1
 
-    # Verify strict zero-PII schema in SQLite
-    with sqlite3.connect(db_file) as conn:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(reports)").fetchall()]
-    assert cols == ["id", "node_id", "category", "created_at"]
+    # Explicit X-Browser-Id overrides
+    custom_id = str(uuid4())
+    s3 = client.post("/api/session", headers={"X-Browser-Id": custom_id})
+    assert s3.status_code == 200
+    assert s3.json()["browser_id"] == custom_id
 
 
-def test_simulate_surge_pending_and_approve_flow(tmp_path):
-    app = create_app(db_path=str(tmp_path / "test.db"), force_fallback_weather=True)
-    client = TestClient(app)
+def test_all_10_disaster_types_accepted(client: TestClient) -> None:
+    expected = {
+        "tornado",
+        "wildfire",
+        "sandstorm",
+        "frost",
+        "avalanche",
+        "flood",
+        "inundation",
+        "landslide",
+        "hail",
+        "extreme_heat",
+    }
+    assert {d.value for d in DisasterType} == expected
 
-    sim = client.post("/simulate-surge")
-    assert sim.status_code == 200
+    for code in expected:
+        resp = client.post(
+            "/api/reports",
+            headers={"X-Browser-Id": str(uuid4())},
+            json={
+                "latitude": LAT,
+                "longitude": LNG,
+                "disaster_type": code,
+                "report_mode": "normal",
+                "location_source": "gps",
+                "client_request_id": str(uuid4()),
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
 
-    state = client.get("/state").json()
-    assert state["alert_state"]["status"] == "PENDING_APPROVAL"
-    assert state["public_alert_active"] is False
-    assert state["any_verified_anomaly"] is True
-    assert state["weather"]["temperature_c"] == 45.0
-    assert state["weather"]["wind_direction_deg"] == 225.0
 
-    out_of_bounds = client.post("/approve-alert", json={"approved": True, "hub_count": 99})
-    assert out_of_bounds.status_code == 422
+def test_emergency_mode_adds_no_math_multiplier(client: TestClient) -> None:
+    resp = client.post(
+        "/api/reports",
+        headers={"X-Browser-Id": str(uuid4())},
+        json={
+            "latitude": LAT,
+            "longitude": LNG,
+            "disaster_type": "flood",
+            "report_mode": "emergency",
+            "location_source": "gps",
+            "client_request_id": str(uuid4()),
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["report"]["base_weight"] == pytest.approx(2.0)
 
-    zero_hubs = client.post("/approve-alert", json={"approved": True, "hub_count": 0})
-    assert zero_hubs.status_code == 422
+    score = client.get(
+        "/api/map",
+        params={"lat": LAT, "lng": LNG, "disaster_type": "flood"},
+    ).json()["query_score"]
+    assert score["total_weight"] == pytest.approx(2.0)
 
-    ok = client.post("/approve-alert", json={"approved": True, "hub_count": 3})
-    assert ok.status_code == 200
 
-    active_state = client.get("/state").json()
-    assert active_state["alert_state"]["status"] == "ACTIVE"
-    assert active_state["public_alert_active"] is True
-    assert len(active_state["hubs"]) == 3
+def test_external_decision_model_url_falls_back_to_rule_v1(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DECISION_MODEL_API_URL", "http://127.0.0.1:59999/nonexistent")
+    out = evaluate_decision_model(
+        DecisionModelInput(
+            query_lat=LAT,
+            query_lng=LNG,
+            disaster_type=DisasterType.FLOOD,
+        )
+    )
+    assert out.model_version == "rule-v1"
+    assert out.query_score.uncertain is True
 
-    # Once ACTIVE, citizen report exposes nearest_hub
-    rep = client.post("/report", json={"node_id": "kepez_dokuma", "category": "vulnerable_assistance"})
-    assert rep.status_code == 200
-    rep_body = rep.json()
-    assert rep_body["public_alert_active"] is True
-    assert rep_body["nearest_hub"] is not None
-    assert "hub_id" in rep_body["nearest_hub"]
 
-    reset_res = client.post("/reset-demo")
-    assert reset_res.status_code == 200
-    reset_state = client.get("/state").json()
-    assert reset_state["alert_state"]["status"] == "MONITORING"
-    assert reset_state["public_alert_active"] is False
+def test_map_without_disaster_type_enriches_events_with_ml_risk(client: TestClient) -> None:
+    for dtype in ("flood", "wildfire"):
+        resp = client.post(
+            "/api/reports",
+            headers={"X-Browser-Id": str(uuid4())},
+            json={
+                "latitude": LAT,
+                "longitude": LNG,
+                "disaster_type": dtype,
+                "report_mode": "normal",
+                "location_source": "gps",
+                "client_request_id": str(uuid4()),
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+
+    map_resp = client.get("/api/map", params={"lat": LAT, "lng": LNG})
+    assert map_resp.status_code == 200
+    body = map_resp.json()
+    assert len(body["events"]) == 2
+    assert len(body["active_reports"]) == 2
+    for ev in body["events"]:
+        assert 0.0 <= ev["risk_1h"] <= 100.0
+        assert 0.0 <= ev["risk_2h"] <= 100.0
+        assert 0.0 <= ev["risk_3h"] <= 100.0
+        assert isinstance(ev["ml_active"], bool)
+
+
+def test_demo_authority_enriched_with_ml_fields(client: TestClient) -> None:
+    resp = client.post(
+        "/api/reports",
+        headers={"X-Browser-Id": str(uuid4())},
+        json={
+            "latitude": LAT,
+            "longitude": LNG,
+            "disaster_type": "extreme_heat",
+            "report_mode": "emergency",
+            "location_source": "gps",
+            "client_request_id": str(uuid4()),
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["demo_record_created"] is True
+
+    demo_resp = client.get("/api/demo-authority")
+    assert demo_resp.status_code == 200
+    records = demo_resp.json()["records"]
+    assert len(records) == 1
+    rec = records[0]
+    assert 0.0 <= rec["priority_score"] <= 100.0
+    assert isinstance(rec["anomaly_flag"], bool)
+    assert 0.0 <= rec["risk_1h"] <= 100.0
+    assert 0.0 <= rec["risk_2h"] <= 100.0
+    assert 0.0 <= rec["risk_3h"] <= 100.0
+
+
+def test_map_stream_returns_sse_with_valid_map_query_response(client: TestClient) -> None:
+    with client.stream("GET", "/api/map/stream", params={"lat": LAT, "lng": LNG, "max_events": 1}) as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        data_line = None
+        for line in resp.iter_lines():
+            if line.startswith("data: "):
+                data_line = line[len("data: "):]
+                break
+        assert data_line is not None
+        parsed = MapQueryResponse.model_validate(json.loads(data_line))
+        assert parsed.query_lat == pytest.approx(LAT)
+        assert parsed.query_lng == pytest.approx(LNG)

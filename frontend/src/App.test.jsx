@@ -1,200 +1,295 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import App from "./App.jsx";
-import * as api from "./api.js";
+import { detectInitialLanguage, DISASTER_CODES, TRANSLATIONS } from "./i18n.js";
 
-vi.mock("./api.js", () => ({
-  fetchState: vi.fn(),
-  submitReport: vi.fn(),
-  simulateSurge: vi.fn(),
-  resetDemo: vi.fn(),
-  approveAlert: vi.fn(),
-}));
-
+// Mock react-leaflet so Leaflet DOM/canvas calls don't fail in jsdom
 vi.mock("react-leaflet", () => ({
-  MapContainer: ({ children }) => <div data-testid="leaflet-map">{children}</div>,
-  TileLayer: () => <div data-testid="leaflet-tile" />,
-  CircleMarker: ({ children }) => <div data-testid="leaflet-circle">{children}</div>,
-  Polyline: ({ children }) => <div data-testid="leaflet-polyline">{children}</div>,
-  Marker: ({ children }) => <div data-testid="leaflet-marker">{children}</div>,
+  MapContainer: ({ children }) => (
+    <div data-testid="leaflet-map">{children}</div>
+  ),
+  TileLayer: () => null,
+  Circle: () => null,
+  CircleMarker: ({ children }) => (
+    <div data-testid="leaflet-marker">{children}</div>
+  ),
   Popup: ({ children }) => <div>{children}</div>,
-  Tooltip: ({ children }) => <div>{children}</div>,
-  useMap: () => ({ setView: vi.fn() }),
+  useMapEvents: (handlers) => {
+    // Expose a clickable trigger for S02 pin placement in tests
+    globalThis.__leafletClickHandler = handlers?.click;
+    return null;
+  },
 }));
 
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }) => <div data-testid="recharts-container">{children}</div>,
-  BarChart: ({ children }) => <div data-testid="recharts-barchart">{children}</div>,
-  Bar: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  Tooltip: () => null,
-  Cell: () => null,
-}));
+describe("Heatnode i18n", () => {
+  it("detects supported languages and falls back to en", () => {
+    expect(detectInitialLanguage("tr-TR")).toBe("tr");
+    expect(detectInitialLanguage("ar-SA")).toBe("ar");
+    expect(detectInitialLanguage("es-MX")).toBe("es");
+    expect(detectInitialLanguage("zh-CN")).toBe("zh");
+    expect(detectInitialLanguage("en-GB")).toBe("en");
+    expect(detectInitialLanguage("fr-FR")).toBe("en");
+  });
+});
 
-function makeMockState(overrides = {}) {
-  return {
-    weather: {
-      temperature_c: 34.2,
-      relative_humidity: 42,
-      wind_speed_kmh: 14,
-      wind_direction_deg: 210,
-      solar_radiation_wm2: 780,
-      utci_c: 36.8,
-      stress_category: "Strong Heat Stress",
-      source: "open-meteo",
-      timestamp: "2026-11-13T12:00:00Z",
-    },
-    alert_state: {
-      status: "MONITORING",
-      hub_count: 3,
-      approved_by: null,
-      updated_at: "2026-11-13T12:00:00Z",
-    },
-    public_alert_active: false,
-    any_verified_anomaly: false,
-    node_states: [
-      {
-        node_id: "kepez_dokuma",
-        name: "Dokuma",
-        district: "Kepez",
-        lat: 36.912,
-        lon: 30.678,
-        report_count: 1,
-        verified_anomaly: false,
-        risk_now: 0.25,
-        risk_1h: 0.3,
-        risk_2h: 0.35,
-        risk_3h: 0.4,
-        threshold_prob_2h: 0.32,
-        shap_drivers: [
-          { driver: "UTCI Heat Index", impact: 0.14 },
-          { driver: "15-min Report Surge", impact: 0.08 },
-        ],
-      },
-      {
-        node_id: "muratpasa_kaleici",
-        name: "Kaleici",
-        district: "Muratpasa",
-        lat: 36.884,
-        lon: 30.704,
-        report_count: 0,
-        verified_anomaly: false,
-        risk_now: 0.18,
-        risk_1h: 0.2,
-        risk_2h: 0.22,
-        risk_3h: 0.24,
-        threshold_prob_2h: 0.2,
-        shap_drivers: [{ driver: "UTCI Heat Index", impact: 0.1 }],
-      },
-    ],
-    propagation_edges: [],
-    hubs: [
-      {
-        hub_id: "hub_1",
-        name: "Dokuma Park Cooling Center",
-        node_id: "kepez_dokuma",
-        district: "Kepez",
-        lat: 36.915,
-        lon: 30.68,
-        assigned_nodes: ["kepez_dokuma"],
-        hub_type: "Cooling & Hydration Hub",
-      },
-    ],
-    nearest_hub_by_node: {
-      kepez_dokuma: {
-        hub_id: "hub_1",
-        name: "Dokuma Park Cooling Center",
-        distance_km: 0.42,
-      },
-      muratpasa_kaleici: {
-        hub_id: "hub_1",
-        name: "Dokuma Park Cooling Center",
-        distance_km: 3.85,
-      },
-    },
-    ...overrides,
-  };
-}
+describe("Heatnode PWA Flow", () => {
+  const originalLang = navigator.language;
+  const originalGeolocation = navigator.geolocation;
 
-describe("HEATNODE AI App", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    Object.defineProperty(navigator, "language", {
+      value: "tr-TR",
+      configurable: true,
+    });
+    globalThis.fetch = vi.fn((url) => {
+      if (String(url).includes("/api/session")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ browser_id: "11111111-1111-4111-8111-111111111111" }),
+        });
+      }
+      if (String(url).includes("/api/map")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              query_lat: 36.89,
+              query_lng: 30.71,
+              radius_m: 500,
+              model_version: "rule-v1",
+              active_reports: [],
+              events: [],
+              heatmap_points: [],
+            }),
+        });
+      }
+      if (String(url).includes("/api/demo-authority")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              is_demo: true,
+              notice: "DEMO ONLY",
+              records: [
+                {
+                  id: "rec-1",
+                  report_id: "rep-12345678",
+                  event_id: "evt-12345678",
+                  disaster_type: "wildfire",
+                  latitude: 36.89,
+                  longitude: 30.71,
+                  report_mode: "emergency",
+                  accepted_at: "2026-11-14T12:00:00Z",
+                  is_demo: true,
+                  risk_1h: 45,
+                  risk_2h: 62,
+                  risk_3h: 78,
+                  anomaly_flag: true,
+                },
+              ],
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
   });
 
-  it("renders top navigation with Citizen View, Crisis Console, and Simulate Crowd Surge", async () => {
-    api.fetchState.mockResolvedValue(makeMockState());
-
-    render(<App />);
-
-    expect(await screen.findByRole("button", { name: /Citizen View/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Crisis Console/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Simulate Crowd Surge/i })).toBeInTheDocument();
+  afterEach(() => {
+    Object.defineProperty(navigator, "language", {
+      value: originalLang,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "geolocation", {
+      value: originalGeolocation,
+      configurable: true,
+    });
+    vi.restoreAllMocks();
   });
 
-  it("shows Monitoring status and hides active evacuation banner when public_alert_active is false", async () => {
-    api.fetchState.mockResolvedValue(
-      makeMockState({
-        public_alert_active: false,
-        alert_state: {
-          status: "MONITORING",
-          hub_count: 3,
-          approved_by: null,
-          updated_at: "2026-11-13T12:00:00Z",
-        },
-      })
-    );
+  it("falls back to English when browser language is unsupported", () => {
+    Object.defineProperty(navigator, "language", {
+      value: "fr-FR",
+      configurable: true,
+    });
 
     render(<App />);
-
-    expect(await screen.findByText(/Monitoring — No Active Emergency Alert/i)).toBeInTheDocument();
-    expect(screen.queryByText(/ACTIVE HEAT EMERGENCY ALERT/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Nearest Safe Cooling Hub/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Allow location access")).toBeInTheDocument();
+    expect(screen.queryByText("Go back")).not.toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
   });
 
-  it("displays active alert banner and nearest Safe Hub details when public_alert_active is true", async () => {
-    api.fetchState.mockResolvedValue(
-      makeMockState({
-        public_alert_active: true,
-        any_verified_anomaly: true,
-        alert_state: {
-          status: "ACTIVE",
-          hub_count: 3,
-          approved_by: "Municipal Operator",
-          updated_at: "2026-11-13T12:05:00Z",
-        },
-      })
-    );
+  it("blocks S03 without valid coordinates and stays on S01 on GPS deny", () => {
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition: (_ok, err) => err({ code: 1 }),
+      },
+      configurable: true,
+    });
 
-    render(<App />);
+    render(<App initialScreen="S03" />);
+    // Guarded: falls back to S01
+    expect(screen.getByText("Konum erişimine izin ver")).toBeInTheDocument();
 
-    expect(await screen.findByText(/ACTIVE HEAT EMERGENCY ALERT/i)).toBeInTheDocument();
-    expect(screen.getByText("Nearest Safe Cooling Hub")).toBeInTheDocument();
-    expect(screen.getAllByText(/Dokuma Park Cooling Center/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/0\.42 km/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Konum erişimine izin ver"));
+    // Stays on S01
+    expect(screen.getByText("Konum erişimine izin ver")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
   });
 
-  it("switches to Crisis Console view when Crisis Console tab is clicked", async () => {
-    api.fetchState.mockResolvedValue(
-      makeMockState({
-        any_verified_anomaly: true,
-        alert_state: {
-          status: "PENDING_APPROVAL",
-          hub_count: 3,
-          approved_by: null,
-          updated_at: "2026-11-13T12:05:00Z",
-        },
-      })
-    );
-
+  it("supports S02 manual pin placement and renders no BackButton on S01-S06", async () => {
     render(<App />);
+    // S01: no BackButton
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
 
-    const consoleTab = await screen.findByRole("button", { name: /Crisis Console/i });
-    fireEvent.click(consoleTab);
+    fireEvent.click(screen.getByText("Konumumu kendim seçeceğim"));
+    // S02: no BackButton
+    expect(screen.getByTestId("leaflet-map")).toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+
+    const confirmBtn = screen.getByText("Konumu onayla").closest("button");
+    expect(confirmBtn).toBeDisabled();
+
+    // Simulate map click
+    act(() => {
+      globalThis.__leafletClickHandler({ latlng: { lat: 36.89, lng: 30.71 } });
+    });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /Approve & Activate Public Alert/i })).toBeInTheDocument();
+      expect(confirmBtn).not.toBeDisabled();
     });
-    expect(screen.getByRole("button", { name: "+2h" })).toBeInTheDocument();
+
+    fireEvent.click(confirmBtn);
+    // S03: no BackButton
+    expect(screen.getByText("Acil bir durumdayım")).toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+  });
+
+  it("submits report on S04 tap, shows Raporunuz ulaştı on accepted, and reuses client_request_id on retry", async () => {
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition: (ok) =>
+          ok({ coords: { latitude: 36.8969, longitude: 30.7133 } }),
+      },
+      configurable: true,
+    });
+
+    const reportBodies = [];
+    let shouldFail = true;
+
+    globalThis.fetch = vi.fn((url, opts) => {
+      if (String(url).includes("/api/session")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ browser_id: "11111111-1111-4111-8111-111111111111" }),
+        });
+      }
+      if (String(url).includes("/api/reports")) {
+        reportBodies.push(JSON.parse(opts.body));
+        if (shouldFail) {
+          return Promise.reject(new Error("Network error"));
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              status: "accepted",
+              event_id: "evt-1",
+              demo_record_created: true,
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByText("Konum erişimine izin ver"));
+
+    // Now on S03
+    expect(screen.getByText("Acil bir durumdayım")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Acil bir durumdayım"));
+
+    // Now on S04: all 10 disaster buttons rendered, no BackButton
+    expect(screen.getAllByRole("button").length).toBe(DISASTER_CODES.length);
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Orman yangını"));
+
+    // Network failure -> S05 must NOT show Raporunuz ulaştı, no BackButton
+    await waitFor(() => {
+      expect(screen.getByText("Tekrar dene")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Raporunuz ulaştı")).not.toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+
+    // Retry with server succeeding
+    shouldFail = false;
+    fireEvent.click(screen.getByText("Tekrar dene"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Raporunuz ulaştı")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+
+    expect(reportBodies.length).toBe(2);
+    expect(reportBodies[0].client_request_id).toBe(
+      reportBodies[1].client_request_id
+    );
+    expect(reportBodies[0].disaster_type).toBe("wildfire");
+    expect(reportBodies[0].report_mode).toBe("emergency");
+    expect(reportBodies[0].location_source).toBe("gps");
+  });
+
+  it("renders unified live S06 map with color legend, no score/refresh UI, and Ana seçime dön button", async () => {
+    Object.defineProperty(navigator, "geolocation", {
+      value: {
+        getCurrentPosition: (ok) =>
+          ok({ coords: { latitude: 36.8969, longitude: 30.7133 } }),
+      },
+      configurable: true,
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByText("Konum erişimine izin ver"));
+    fireEvent.click(screen.getByText("Çevrem hakkında bilgi almak istiyorum"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Canlı akış")).toBeInTheDocument();
+    });
+
+    // No tablist, no Confidence / Criticality / Active Reports / Refresh / BackButton
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByText("Güvenilirlik")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kritiklik")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aktif rapor")).not.toBeInTheDocument();
+    expect(screen.queryByText("Yenile")).not.toBeInTheDocument();
+    expect(screen.queryByText("Geri dön")).not.toBeInTheDocument();
+
+    // All disaster types rendered in the color legend
+    for (const code of DISASTER_CODES) {
+      expect(screen.getByText(TRANSLATIONS.tr.disasters[code])).toBeInTheDocument();
+    }
+
+    // Has "Ana seçime dön" button that returns to S03
+    const mainChoiceBtn = screen.getByText("Ana seçime dön");
+    expect(mainChoiceBtn).toBeInTheDocument();
+    fireEvent.click(mainChoiceBtn);
+    expect(screen.getByText("Acil bir durumdayım")).toBeInTheDocument();
+  });
+
+  it("renders Demo Authority Panel clearly labeled DEMO with live stream and ML badges", async () => {
+    render(<App initialRoute="/demo-authority" />);
+    expect(
+      screen.getByText(/DEMO — NO REAL INSTITUTION NOTIFICATIONS/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("Canlı akış")).toBeInTheDocument();
+    expect(screen.queryByText("Yenile")).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText("Orman yangını")).toBeInTheDocument();
+    });
+    expect(screen.getByText("+1h 45%")).toBeInTheDocument();
+    expect(screen.getByText("+2h 62%")).toBeInTheDocument();
+    expect(screen.getByText("+3h 78%")).toBeInTheDocument();
+    expect(screen.getByText("Anomali")).toBeInTheDocument();
   });
 });

@@ -2,10 +2,4 @@ fastapi
 uvicorn[standard]
 pydantic
 httpx
-pandas
-numpy
-scikit-learn
-xgboost
-shap
-joblib
 pytest

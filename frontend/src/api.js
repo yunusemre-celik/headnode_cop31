@@ -1,61 +1,205 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const BROWSER_ID_KEY = "heatnode_browser_id";
 
-async function request(path, options = {}) {
+function getStoredBrowserId() {
+  try {
+    return window.localStorage.getItem(BROWSER_ID_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setStoredBrowserId(id) {
+  if (!id) return;
+  try {
+    window.localStorage.setItem(BROWSER_ID_KEY, id);
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+}
+
+export function generateRequestId() {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+async function apiFetch(path, options = {}) {
+  const browserId = getStoredBrowserId();
+  const headers = {
+    ...(options.headers || {}),
+  };
+  if (browserId && !headers["X-Browser-Id"]) {
+    headers["X-Browser-Id"] = browserId;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
+    credentials: "include",
     ...options,
+    headers,
   });
 
   if (!response.ok) {
-    let message = `Request failed (${response.status})`;
+    let detail = `HTTP ${response.status}`;
     try {
-      const errData = await response.json();
-      if (errData?.detail) {
-        message = typeof errData.detail === "string"
-          ? errData.detail
-          : JSON.stringify(errData.detail);
-      }
+      const errBody = await response.json();
+      detail = errBody?.detail || errBody?.message || detail;
     } catch {
-      // ignore non-JSON error body
+      // keep status text
     }
-    throw new Error(message);
+    const err = new Error(detail);
+    err.status = response.status;
+    throw err;
   }
 
   return response.json();
 }
 
-export function fetchState() {
-  return request("/state");
+export async function ensureSession() {
+  const data = await apiFetch("/api/session", { method: "POST" });
+  if (data?.browser_id) {
+    setStoredBrowserId(data.browser_id);
+  }
+  return data;
 }
 
-export function submitReport(nodeId, category) {
-  return request("/report", {
+export async function submitReport({
+  disaster_type,
+  report_mode,
+  latitude,
+  longitude,
+  location_source,
+  client_request_id,
+}) {
+  return apiFetch("/api/reports", {
     method: "POST",
-    body: JSON.stringify({ node_id: nodeId, category }),
-  });
-}
-
-export function simulateSurge() {
-  return request("/simulate-surge", {
-    method: "POST",
-  });
-}
-
-export function resetDemo() {
-  return request("/reset-demo", {
-    method: "POST",
-  });
-}
-
-export function approveAlert(approved, hubCount = 3) {
-  return request("/approve-alert", {
-    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      approved,
-      hub_count: hubCount,
+      disaster_type,
+      report_mode,
+      latitude,
+      longitude,
+      location_source,
+      client_request_id,
     }),
+  });
+}
+
+export async function fetchMapData({ lat, lng, disaster_type } = {}) {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+  });
+  if (disaster_type) {
+    params.set("disaster_type", disaster_type);
+  }
+  return apiFetch(`/api/map?${params.toString()}`);
+}
+
+export async function fetchDemoAuthority({ limit } = {}) {
+  const params = new URLSearchParams();
+  if (limit !== undefined && limit !== null) {
+    params.set("limit", String(limit));
+  }
+  const qs = params.toString();
+  return apiFetch(`/api/demo-authority${qs ? `?${qs}` : ""}`);
+}
+
+const STREAM_POLL_INTERVAL_MS = 2500;
+
+function createStreamSubscription({ streamPath, pollFn, onData, onError }) {
+  let closed = false;
+  let es = null;
+  let intervalId = null;
+
+  const poll = async () => {
+    if (closed) return;
+    try {
+      const data = await pollFn();
+      if (!closed) onData?.(data);
+    } catch (err) {
+      if (!closed) onError?.(err);
+    }
+  };
+
+  const startPolling = () => {
+    if (closed || intervalId !== null) return;
+    poll();
+    intervalId = setInterval(poll, STREAM_POLL_INTERVAL_MS);
+  };
+
+  if (typeof EventSource !== "undefined") {
+    try {
+      es = new EventSource(`${API_BASE}${streamPath}`, {
+        withCredentials: true,
+      });
+      es.onmessage = (event) => {
+        if (closed) return;
+        try {
+          const parsed = JSON.parse(event.data);
+          onData?.(parsed);
+        } catch (err) {
+          onError?.(err);
+        }
+      };
+      es.onerror = () => {
+        if (es) {
+          es.close();
+          es = null;
+        }
+        startPolling();
+      };
+    } catch {
+      startPolling();
+    }
+  } else {
+    startPolling();
+  }
+
+  return function unsubscribe() {
+    closed = true;
+    if (es) {
+      es.close();
+      es = null;
+    }
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+}
+
+export function subscribeMapStream({ lat, lng, onData, onError }) {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+  });
+  return createStreamSubscription({
+    streamPath: `/api/map/stream?${params.toString()}`,
+    pollFn: () => fetchMapData({ lat, lng }),
+    onData,
+    onError,
+  });
+}
+
+export function subscribeDemoAuthorityStream({ limit, onData, onError } = {}) {
+  const params = new URLSearchParams();
+  if (limit !== undefined && limit !== null) {
+    params.set("limit", String(limit));
+  }
+  const qs = params.toString();
+  return createStreamSubscription({
+    streamPath: `/api/demo-authority/stream${qs ? `?${qs}` : ""}`,
+    pollFn: () => fetchDemoAuthority({ limit }),
+    onData,
+    onError,
   });
 }

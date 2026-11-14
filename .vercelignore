@@ -1,0 +1,12 @@
+node_modules
+frontend/node_modules
+frontend/dist
+.pytest_cache
+.superpowers
+__pycache__
+*.db
+*.db-journal
+ml
+data
+docs
+tests

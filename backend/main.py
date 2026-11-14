@@ -1,206 +1,478 @@
-"""FastAPI Application, Alert Lifecycle State Machine & Endpoints for HEATNODE AI."""
+"""FastAPI application and HTTP endpoints for COP31 Heatnode."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+import asyncio
+from collections import defaultdict
+from contextlib import asynccontextmanager
+import math
+import os
+import threading
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from uuid import UUID, uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.responses import StreamingResponse
 
-from backend.db import Database
-from backend.graph import load_graph
-from backend.pipeline import HeatnodePipeline
-from backend.weather import WeatherService, WeatherSnapshot, compute_utci, utci_category
+from backend.db import Database, utc_now
+from backend.decision_model import (
+    ContributionInput,
+    DecisionModelInput,
+    GridPointInput,
+    evaluate_decision_model,
+)
+from backend.geo import generate_grid_points, haversine_meters
+from backend.ml_inference import is_ml_available, predict_hazard_ml
+from backend.models import (
+    DEFAULT_MODEL_VERSION,
+    DemoAuthorityListResponse,
+    DemoAuthorityRecord,
+    DisasterType,
+    EVENT_RADIUS_METERS,
+    EventRecord,
+    MapQueryResponse,
+    ReportCreateRequest,
+    ReportCreateResponse,
+    ReportMode,
+    ReportRecord,
+    ReportStatus,
+    ScoreResult,
+    SessionResponse,
+)
 
-VALID_CATEGORIES = {
-    "extreme_heat",
-    "power_water_outage",
-    "smoke_odor",
-    "vulnerable_assistance",
-}
+BROWSER_COOKIE_NAME = "heatnode_browser_id"
+COOKIE_MAX_AGE_SECONDS = 365 * 24 * 3600
+SSE_HEARTBEAT_SECONDS = 2.5
 
-DEMO_SURGE_NODES = [
-    ("kepez_dokuma", 14),
-    ("kepez_fabrikalar", 10),
-    ("kepez_yesilyurt", 10),
-    ("kepez_teomanpasa", 8),
-]
+db = Database()
+
+_subscribers_lock = threading.Lock()
+_stream_subscribers: Set[Tuple[asyncio.AbstractEventLoop, asyncio.Queue[int]]] = set()
 
 
-class ReportRequest(BaseModel):
-    """Zero-PII citizen heat report payload."""
-
-    node_id: str
-    category: str
+def _enqueue_update(queue: asyncio.Queue[int]) -> None:
+    if not queue.full():
+        queue.put_nowait(1)
 
 
-class ApproveAlertRequest(BaseModel):
-    """Municipal operator Human-in-the-Loop (HITL) alert approval payload."""
+def _notify_subscribers() -> None:
+    with _subscribers_lock:
+        subscribers = list(_stream_subscribers)
+    for loop, queue in subscribers:
+        if not loop.is_closed():
+            try:
+                loop.call_soon_threadsafe(_enqueue_update, queue)
+            except RuntimeError:
+                pass
 
-    approved: bool
-    hub_count: int = Field(default=3, ge=1, le=5)
-    approved_by: Optional[str] = "Municipal Operator"
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    db.init_db()
+    yield
 
 
-def _build_demo_surge_weather() -> WeatherSnapshot:
-    """Build the 45°C SW-wind Antalya demo heatwave WeatherSnapshot."""
-    temp_c = 45.0
-    rel_humidity = 48.0
-    wind_speed_kmh = 18.0
-    wind_dir_deg = 225.0
-    solar_wm2 = 950.0
-    utci = compute_utci(temp_c, rel_humidity, wind_speed_kmh / 3.6, solar_wm2)
+app = FastAPI(
+    title="COP31 Heatnode API",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=os.getenv("CORS_ORIGIN_REGEX", r"https?://.*"),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _parse_uuid_or_none(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    try:
+        return str(UUID(raw.strip()))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _resolve_browser_id(
+    request: Request,
+    x_browser_id: Optional[str],
+) -> Tuple[str, bool]:
+    """Resolve browser_id from X-Browser-Id header, HttpOnly cookie, or issue a new UUID."""
+    if x_browser_id is not None and x_browser_id.strip() != "":
+        parsed = _parse_uuid_or_none(x_browser_id)
+        if parsed is None:
+            raise HTTPException(status_code=400, detail="Invalid X-Browser-Id UUID")
+        return parsed, False
+
+    cookie_val = request.cookies.get(BROWSER_COOKIE_NAME)
+    parsed_cookie = _parse_uuid_or_none(cookie_val)
+    if parsed_cookie is not None:
+        return parsed_cookie, False
+
+    return str(uuid4()), True
+
+
+def _set_browser_cookie(response: Response, browser_id: str) -> None:
+    response.set_cookie(
+        key=BROWSER_COOKIE_NAME,
+        value=browser_id,
+        max_age=COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _validate_query_coord(value: float, name: str, min_val: float, max_val: float) -> float:
+    if math.isnan(value) or math.isinf(value) or value < min_val or value > max_val:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{name} must be a finite number between {min_val} and {max_val}",
+        )
+    return float(value)
+
+
+@app.get("/api/health")
+@app.get("/health")
+def health_check() -> Dict[str, Any]:
+    """Liveness check endpoint."""
     return {
-        "temperature_c": temp_c,
-        "relative_humidity": rel_humidity,
-        "wind_speed_kmh": wind_speed_kmh,
-        "wind_direction_deg": wind_dir_deg,
-        "solar_radiation_wm2": solar_wm2,
-        "utci_c": utci,
-        "stress_category": utci_category(utci),
-        "source": "simulation",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "ok",
+        "service": "cop31-heatnode",
+        "model_version": DEFAULT_MODEL_VERSION,
+        "ml_active": is_ml_available(),
     }
 
 
-def create_app(
-    db_path: str = "heatnode.db",
-    force_fallback_weather: bool = False,
-) -> FastAPI:
-    """Create and configure the HEATNODE AI FastAPI application."""
-    application = FastAPI(title="HEATNODE AI", version="0.1.0")
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+@app.post("/api/session", response_model=SessionResponse)
+def create_or_get_session(
+    request: Request,
+    response: Response,
+    x_browser_id: Optional[str] = Header(default=None, alias="X-Browser-Id"),
+) -> SessionResponse:
+    """Issue or return the server-managed random UUID browser_id."""
+    browser_id, is_new = _resolve_browser_id(request, x_browser_id)
+    if is_new or request.cookies.get(BROWSER_COOKIE_NAME) != browser_id:
+        _set_browser_cookie(response, browser_id)
+    return SessionResponse(browser_id=browser_id)
+
+
+@app.post("/api/reports", response_model=ReportCreateResponse)
+def submit_report(
+    payload: ReportCreateRequest,
+    request: Request,
+    response: Response,
+    x_browser_id: Optional[str] = Header(default=None, alias="X-Browser-Id"),
+) -> ReportCreateResponse:
+    """Validate and submit a disaster report with idempotency, clustering, and duplicate detection."""
+    db.init_db()
+    browser_id, is_new = _resolve_browser_id(request, x_browser_id)
+    if is_new:
+        _set_browser_cookie(response, browser_id)
+
+    result = db.submit_report(browser_id=browser_id, payload=payload)
+    if result.status == ReportStatus.ACCEPTED:
+        _notify_subscribers()
+    return result
+
+
+def _build_map_response(
+    lat: float,
+    lng: float,
+    disaster_type: Optional[DisasterType],
+    area_radius_m: float,
+) -> MapQueryResponse:
+    """Build MapQueryResponse with ML hazard propagation enrichment on nearby events."""
+    db.init_db()
+    q_lat = _validate_query_coord(lat, "lat", -90.0, 90.0)
+    q_lng = _validate_query_coord(lng, "lng", -180.0, 180.0)
+    now = utc_now()
+
+    all_reports, all_events = db.get_active_reports_and_events(
+        disaster_type=disaster_type,
+        now=now,
+    )
+    event_by_id: Dict[str, EventRecord] = {ev.id: ev for ev in all_events}
+
+    reports_by_event: Dict[str, List[ReportRecord]] = defaultdict(list)
+    for r in all_reports:
+        reports_by_event[r.event_id].append(r)
+
+    # Filter reports/events within area_radius_m for display, keeping full event origins for scoring
+    nearby_events_raw = [
+        ev
+        for ev in all_events
+        if haversine_meters(q_lat, q_lng, ev.origin_lat, ev.origin_lng) <= area_radius_m
+    ]
+    nearby_events: List[EventRecord] = []
+    for ev in nearby_events_raw:
+        ev_reports = reports_by_event.get(ev.id, [])
+        ev_count = len(ev_reports) if ev_reports else ev.active_report_count
+        ev_weight = (
+            sum(r.base_weight for r in ev_reports)
+            if ev_reports
+            else float(ev.active_report_count)
+        )
+        ev_emergency = any(r.report_mode == ReportMode.EMERGENCY for r in ev_reports)
+        ml_pred = predict_hazard_ml(
+            disaster_type=ev.disaster_type.value,
+            active_report_count=ev_count,
+            total_weight=ev_weight,
+            lat=ev.origin_lat,
+            lng=ev.origin_lng,
+            is_emergency=ev_emergency,
+        )
+        nearby_events.append(
+            ev.model_copy(
+                update={
+                    "risk_1h": ml_pred["risk_1h"],
+                    "risk_2h": ml_pred["risk_2h"],
+                    "risk_3h": ml_pred["risk_3h"],
+                    "ml_active": ml_pred["ml_active"],
+                }
+            )
+        )
+
+    nearby_event_ids = {ev.id for ev in nearby_events}
+    nearby_reports: List[ReportRecord] = [
+        r
+        for r in all_reports
+        if r.event_id in nearby_event_ids
+        or haversine_meters(q_lat, q_lng, r.latitude, r.longitude) <= area_radius_m
+    ]
+
+    contributions = [
+        ContributionInput(
+            report_id=r.id,
+            event_id=r.event_id,
+            disaster_type=r.disaster_type,
+            origin_lat=event_by_id[r.event_id].origin_lat,
+            origin_lng=event_by_id[r.event_id].origin_lng,
+            base_weight=r.base_weight,
+        )
+        for r in all_reports
+        if r.event_id in event_by_id
+    ]
+
+    raw_grid = generate_grid_points(
+        q_lat,
+        q_lng,
+        radius_m=min(area_radius_m, 1000.0),
+        step_m=200.0,
+    )
+    grid_inputs = [GridPointInput(lat=pt[0], lng=pt[1]) for pt in raw_grid]
+
+    scores_by_disaster: Dict[str, ScoreResult] = {}
+    query_score: Optional[ScoreResult] = None
+    heatmap_points = []
+    model_version = DEFAULT_MODEL_VERSION
+    model_parameters: Dict[str, object] = {}
+
+    if disaster_type is not None:
+        model_out = evaluate_decision_model(
+            DecisionModelInput(
+                query_lat=q_lat,
+                query_lng=q_lng,
+                disaster_type=disaster_type,
+                radius_m=EVENT_RADIUS_METERS,
+                contributions=contributions,
+                grid_points=grid_inputs,
+                calculated_at=now,
+            )
+        )
+        query_score = model_out.query_score
+        scores_by_disaster[disaster_type.value] = model_out.query_score
+        heatmap_points = model_out.heatmap_points
+        model_version = model_out.model_version
+        model_parameters = model_out.parameters
+    else:
+        for d_type in DisasterType:
+            model_out = evaluate_decision_model(
+                DecisionModelInput(
+                    query_lat=q_lat,
+                    query_lng=q_lng,
+                    disaster_type=d_type,
+                    radius_m=EVENT_RADIUS_METERS,
+                    contributions=contributions,
+                    grid_points=[],
+                    calculated_at=now,
+                )
+            )
+            scores_by_disaster[d_type.value] = model_out.query_score
+            model_version = model_out.model_version
+            model_parameters = model_out.parameters
+
+    return MapQueryResponse(
+        query_lat=q_lat,
+        query_lng=q_lng,
+        disaster_type=disaster_type,
+        radius_m=EVENT_RADIUS_METERS,
+        model_version=model_version,
+        model_parameters=model_parameters,
+        query_score=query_score,
+        scores_by_disaster=scores_by_disaster,
+        active_reports=nearby_reports,
+        events=nearby_events,
+        heatmap_points=heatmap_points,
+        calculated_at=now,
     )
 
-    db = Database(db_path=db_path)
+
+def _build_demo_authority_response(limit: int) -> DemoAuthorityListResponse:
+    """Build DemoAuthorityListResponse enriched with ML risk/anomaly/priority and sorted by priority."""
     db.init_db()
-    graph = load_graph()
-    weather_service = WeatherService()
-    pipeline = HeatnodePipeline(graph, "ml/artifacts/xgb_propagation.joblib")
+    now = utc_now()
+    records = db.list_demo_authority_records(limit=limit)
+    all_reports, _ = db.get_active_reports_and_events(now=now)
+    reports_by_event: Dict[str, List[ReportRecord]] = defaultdict(list)
+    for r in all_reports:
+        reports_by_event[r.event_id].append(r)
 
-    application.state.weather_override = None
-
-    def _evaluate_state() -> Dict[str, Any]:
-        weather = application.state.weather_override
-        if weather is None:
-            weather = weather_service.get_current_weather(
-                force_fallback=force_fallback_weather
+    enriched: List[DemoAuthorityRecord] = []
+    for rec in records:
+        ev_reports = reports_by_event.get(rec.event_id, [])
+        ev_count = len(ev_reports) if ev_reports else 1
+        ev_weight = sum(r.base_weight for r in ev_reports) if ev_reports else 2.0
+        ml_pred = predict_hazard_ml(
+            disaster_type=rec.disaster_type.value,
+            active_report_count=ev_count,
+            total_weight=ev_weight,
+            lat=rec.latitude,
+            lng=rec.longitude,
+            is_emergency=(rec.report_mode == ReportMode.EMERGENCY),
+        )
+        enriched.append(
+            rec.model_copy(
+                update={
+                    "risk_1h": ml_pred["risk_1h"],
+                    "risk_2h": ml_pred["risk_2h"],
+                    "risk_3h": ml_pred["risk_3h"],
+                    "anomaly_flag": ml_pred["anomaly_flag"],
+                    "anomaly_score": ml_pred["anomaly_score"],
+                    "priority_score": ml_pred["priority_score"],
+                    "ml_active": ml_pred["ml_active"],
+                }
             )
-
-        reports = db.get_recent_reports(minutes=20)
-        alert_state = db.get_alert_state()
-        eval_result = pipeline.evaluate(
-            weather=weather,
-            reports=reports,
-            hub_count=alert_state["hub_count"],
         )
 
-        if alert_state["status"] == "MONITORING" and eval_result["any_verified_anomaly"]:
-            alert_state = db.set_alert_state(
-                status="PENDING_APPROVAL",
-                hub_count=alert_state["hub_count"],
-                approved_by=None,
-            )
-
-        public_alert_active = alert_state["status"] == "ACTIVE"
-        return {
-            "weather": weather,
-            "alert_state": alert_state,
-            "public_alert_active": public_alert_active,
-            "any_verified_anomaly": eval_result["any_verified_anomaly"],
-            "node_states": eval_result["node_states"],
-            "propagation_edges": eval_result["propagation_edges"],
-            "hubs": eval_result["hubs"],
-            "nearest_hub_by_node": eval_result["nearest_hub_by_node"],
-        }
-
-    @application.get("/health")
-    def health() -> Dict[str, Any]:
-        return {"status": "ok", "nodes_loaded": len(graph.nodes)}
-
-    @application.get("/state")
-    def get_state() -> Dict[str, Any]:
-        return _evaluate_state()
-
-    @application.post("/report")
-    def submit_report(payload: ReportRequest) -> Dict[str, Any]:
-        if payload.node_id not in graph.nodes:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid node_id: {payload.node_id}",
-            )
-        if payload.category not in VALID_CATEGORIES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid category: {payload.category}",
-            )
-
-        db.insert_report(payload.node_id, payload.category)
-        state = _evaluate_state()
-        public_alert_active = state["public_alert_active"]
-        nearest_hub = (
-            state["nearest_hub_by_node"].get(payload.node_id)
-            if public_alert_active
-            else None
-        )
-        return {
-            "accepted": True,
-            "node_id": payload.node_id,
-            "alert_status": state["alert_state"]["status"],
-            "public_alert_active": public_alert_active,
-            "nearest_hub": nearest_hub,
-        }
-
-    @application.post("/simulate-surge")
-    def simulate_surge() -> Dict[str, Any]:
-        categories = sorted(VALID_CATEGORIES)
-        bulk_reports: List[Dict[str, str]] = []
-        idx = 0
-        for node_id, count in DEMO_SURGE_NODES:
-            for _ in range(count):
-                bulk_reports.append(
-                    {
-                        "node_id": node_id,
-                        "category": categories[idx % len(categories)],
-                    }
-                )
-                idx += 1
-
-        db.insert_bulk_reports(bulk_reports)
-        application.state.weather_override = _build_demo_surge_weather()
-        return _evaluate_state()
-
-    @application.post("/reset-demo")
-    def reset_demo() -> Dict[str, Any]:
-        db.clear_reports()
-        application.state.weather_override = None
-        db.set_alert_state("MONITORING", 3, approved_by=None)
-        return _evaluate_state()
-
-    @application.post("/approve-alert")
-    def approve_alert(payload: ApproveAlertRequest) -> Dict[str, Any]:
-        if payload.approved:
-            db.set_alert_state(
-                status="ACTIVE",
-                hub_count=payload.hub_count,
-                approved_by=payload.approved_by,
-            )
-        else:
-            db.set_alert_state(
-                status="MONITORING",
-                hub_count=payload.hub_count,
-                approved_by=None,
-            )
-        return _evaluate_state()
-
-    return application
+    enriched.sort(
+        key=lambda r: (r.priority_score if r.priority_score is not None else 0.0, r.accepted_at),
+        reverse=True,
+    )
+    return DemoAuthorityListResponse(
+        is_demo=True,
+        records=enriched,
+    )
 
 
-app = create_app()
+async def _sse_event_stream(
+    request: Request,
+    build_json_payload: Callable[[], str],
+    max_events: Optional[int] = None,
+):
+    """Yield SSE data frames immediately on connect, on new report notifications, and every 2.5s."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[int] = asyncio.Queue(maxsize=1)
+    subscriber = (loop, queue)
+    with _subscribers_lock:
+        _stream_subscribers.add(subscriber)
+
+    try:
+        yield f"data: {build_json_payload()}\n\n"
+        sent = 1
+        while max_events is None or sent < max_events:
+            if await request.is_disconnected():
+                break
+            try:
+                await asyncio.wait_for(queue.get(), timeout=SSE_HEARTBEAT_SECONDS)
+            except asyncio.TimeoutError:
+                pass
+            if await request.is_disconnected():
+                break
+            yield f"data: {build_json_payload()}\n\n"
+            sent += 1
+    except asyncio.CancelledError:
+        pass
+    finally:
+        with _subscribers_lock:
+            _stream_subscribers.discard(subscriber)
+
+
+@app.get("/api/map", response_model=MapQueryResponse)
+def get_map_data(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    disaster_type: Optional[DisasterType] = Query(default=None),
+    area_radius_m: float = Query(default=1500.0, gt=0.0, le=10000.0),
+) -> MapQueryResponse:
+    """Return active reports, events, and decision-model scores around (lat, lng)."""
+    return _build_map_response(
+        lat=lat,
+        lng=lng,
+        disaster_type=disaster_type,
+        area_radius_m=area_radius_m,
+    )
+
+
+@app.get("/api/map/stream")
+async def stream_map_data(
+    request: Request,
+    lat: float = Query(...),
+    lng: float = Query(...),
+    disaster_type: Optional[DisasterType] = Query(default=None),
+    area_radius_m: float = Query(default=1500.0, gt=0.0, le=10000.0),
+    max_events: Optional[int] = Query(default=None, ge=1),
+) -> StreamingResponse:
+    """Server-Sent Events stream of MapQueryResponse around (lat, lng)."""
+    _validate_query_coord(lat, "lat", -90.0, 90.0)
+    _validate_query_coord(lng, "lng", -180.0, 180.0)
+
+    def _build() -> str:
+        return _build_map_response(
+            lat=lat,
+            lng=lng,
+            disaster_type=disaster_type,
+            area_radius_m=area_radius_m,
+        ).model_dump_json()
+
+    return StreamingResponse(
+        _sse_event_stream(request, _build, max_events=max_events),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/demo-authority", response_model=DemoAuthorityListResponse)
+def get_demo_authority_records(
+    limit: int = Query(default=100, ge=1, le=500),
+) -> DemoAuthorityListResponse:
+    """List demo emergency records (never sends real institution notifications)."""
+    return _build_demo_authority_response(limit=limit)
+
+
+@app.get("/api/demo-authority/stream")
+async def stream_demo_authority_records(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=500),
+    max_events: Optional[int] = Query(default=None, ge=1),
+) -> StreamingResponse:
+    """Server-Sent Events stream of DemoAuthorityListResponse."""
+
+    def _build() -> str:
+        return _build_demo_authority_response(limit=limit).model_dump_json()
+
+    return StreamingResponse(
+        _sse_event_stream(request, _build, max_events=max_events),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

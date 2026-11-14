@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 import threading
 from typing import Any, Dict, Optional
 
 _ARTIFACT_PATH = Path(__file__).resolve().parent.parent / "ml" / "artifacts" / "xgb_propagation.joblib"
+_METRICS_PATH = Path(__file__).resolve().parent.parent / "ml" / "artifacts" / "training_metrics.json"
 
 _LOAD_LOCK = threading.Lock()
 _LOAD_ATTEMPTED = False
@@ -221,4 +223,54 @@ def predict_hazard_ml(
         "anomaly_flag": anomaly_flag,
         "anomaly_score": anomaly_score,
         "priority_score": priority_score,
+    }
+
+
+def get_ml_metadata() -> Dict[str, Any]:
+    """Return measured ML validation metrics, feature counts, data sources, and limitations."""
+    validation_metrics: Dict[str, Any] = {}
+    if _METRICS_PATH.is_file():
+        try:
+            with _METRICS_PATH.open("r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                validation_metrics = loaded
+        except Exception:
+            validation_metrics = {}
+
+    bundle = _load_bundle()
+    feature_columns = bundle.get("feature_columns") if isinstance(bundle, dict) else None
+    feature_count = len(feature_columns) if isinstance(feature_columns, list) else 11
+
+    return {
+        "ml_active": bundle is not None,
+        "models": {
+            "propagation": "XGBRegressor (+1h/+2h/+3h)",
+            "anomaly_detection": "IsolationForest (contamination=0.02)",
+            "evacuation_routing": "Risk-aware Dijkstra over 24 Antalya nodes / 92 edges",
+        },
+        "feature_count": feature_count,
+        "isolation_forest_feature_count": 5,
+        "dataset": {
+            "weather_hours": 43848,
+            "valid_hours": 43845,
+            "nodes": 24,
+            "edges": 92,
+            "total_samples": 1052280,
+            "train_samples": 841824,
+            "val_samples": 210456,
+            "split": "chronological_80_20",
+        },
+        "validation_metrics": validation_metrics,
+        "data_sources": [
+            "Open-Meteo 5-year hourly weather archive (2021-11-01 to 2026-11-01) with physics-consistent synthetic fallback",
+            "Antalya 24-node neighborhood/intersection graph & 92 directed edges",
+            "Anonymous Zero-PII citizen reports (500 m spatial clustering)",
+        ],
+        "limitations": [
+            "Trained on physics-proxy UTCI and synthetic crowd-burst risk labels rather than municipal 112/hospital heatstroke records",
+            "Zero-PII neighborhood-centroid resolution rather than street-level GPS",
+            "Live inference uses characteristic disaster meteorological profiles when live weather feed is offline, falling back to rule-v1 if ML artifacts are unavailable",
+            "Next pilot step: calibrate with Antalya Metropolitan Municipality / MGM and 112/hospital heatstroke records",
+        ],
     }

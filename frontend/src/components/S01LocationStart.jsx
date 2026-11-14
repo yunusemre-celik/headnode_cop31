@@ -3,6 +3,8 @@ import { LocateFixed, MapPin } from "lucide-react";
 
 export default function S01LocationStart({
   t,
+  lang = "en",
+  onChangeLang,
   onGpsSuccess,
   onManualSelect,
 }) {
@@ -51,6 +53,40 @@ export default function S01LocationStart({
 
   return (
     <div className="flex flex-col justify-center min-h-dvh p-4 sm:p-6 max-w-md mx-auto gap-4">
+      {onChangeLang && (
+        <div className="flex justify-end">
+          <div
+            role="group"
+            aria-label="Language"
+            className="inline-flex rounded-xl bg-slate-900 border border-slate-700 p-0.5 text-xs font-semibold"
+          >
+            <button
+              type="button"
+              onClick={() => onChangeLang("en")}
+              aria-pressed={lang === "en"}
+              className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors ${
+                lang === "en"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => onChangeLang("tr")}
+              aria-pressed={lang === "tr"}
+              className={`px-2.5 py-1 rounded-lg cursor-pointer transition-colors ${
+                lang === "tr"
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              TR
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 flex flex-col justify-center gap-4">
         <button
           type="button"

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import sqlite3
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from uuid import uuid4
 
 from backend.geo import haversine_meters
@@ -161,6 +161,15 @@ class Database:
                     browser_id TEXT NOT NULL,
                     response_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS safezones (
+                    node_id TEXT PRIMARY KEY,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT NOT NULL
                 )
                 """
             )
@@ -525,3 +534,30 @@ class Database:
             )
             for row in rows
         ]
+
+    def get_active_safezone_ids(self) -> Set[str]:
+        """Return the set of currently active safezone node IDs."""
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                "SELECT node_id FROM safezones WHERE is_active = 1"
+            ).fetchall()
+        return {row["node_id"] for row in rows}
+
+    def set_safezone_active(self, node_id: str, is_active: bool) -> bool:
+        """Persist active state for a safezone node and return the resulting state."""
+        now_iso = _to_iso(utc_now())
+        active_int = 1 if is_active else 0
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                """
+                INSERT INTO safezones (node_id, is_active, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(node_id) DO UPDATE SET
+                    is_active = excluded.is_active,
+                    updated_at = excluded.updated_at
+                """,
+                (node_id, active_int, now_iso),
+            )
+            conn.execute("COMMIT")
+        return is_active

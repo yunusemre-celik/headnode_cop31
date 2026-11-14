@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -168,6 +168,52 @@ class HeatmapPoint(BaseModel):
     active_report_count: int
 
 
+class SafezoneNode(BaseModel):
+    """Neighborhood or major intersection node that can be marked as a safezone."""
+
+    node_id: str
+    name: str
+    district: str
+    intersection_name: str
+    lat: float
+    lng: float
+    is_active: bool = False
+    is_hazardous: bool = False
+
+
+class SafezoneToggleRequest(BaseModel):
+    """Optional request body for toggling a safezone node."""
+
+    is_active: Optional[bool] = None
+
+
+class SafezonesListResponse(BaseModel):
+    """Response for GET /api/safezones."""
+
+    nodes: List[SafezoneNode] = Field(default_factory=list)
+
+
+class RouteStep(BaseModel):
+    """Single intersection waypoint along an evacuation route."""
+
+    node_id: str
+    name: str
+    intersection_name: str
+    lat: float
+    lng: float
+
+
+class SafeRoute(BaseModel):
+    """Risk-aware evacuation route from user's location to the nearest reachable safezone."""
+
+    target_safezone: SafezoneNode
+    waypoints: List[List[float]] = Field(default_factory=list)
+    steps: List[RouteStep] = Field(default_factory=list)
+    total_distance_km: float
+    avoided_all_hazards: bool = True
+    status: Literal["safe", "fallback_risky"] = "safe"
+
+
 class MapQueryResponse(BaseModel):
     """Response for GET /api/map."""
 
@@ -182,6 +228,8 @@ class MapQueryResponse(BaseModel):
     active_reports: List[ReportRecord] = Field(default_factory=list)
     events: List[EventRecord] = Field(default_factory=list)
     heatmap_points: List[HeatmapPoint] = Field(default_factory=list)
+    safezones: List[SafezoneNode] = Field(default_factory=list)
+    safe_route: Optional[SafeRoute] = None
     calculated_at: datetime
 
 
@@ -212,3 +260,4 @@ class DemoAuthorityListResponse(BaseModel):
     is_demo: bool = True
     notice: str = "DEMO ONLY: No real institution notifications are sent."
     records: List[DemoAuthorityRecord] = Field(default_factory=list)
+    nodes: List[SafezoneNode] = Field(default_factory=list)

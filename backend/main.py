@@ -11,7 +11,7 @@ import threading
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import Body, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -23,7 +23,7 @@ from backend.decision_model import (
     evaluate_decision_model,
 )
 from backend.geo import generate_grid_points, haversine_meters
-from backend.ml_inference import is_ml_available, predict_hazard_ml
+from backend.ml_inference import get_ml_metadata, is_ml_available, predict_hazard_ml
 from backend.models import (
     DEFAULT_MODEL_VERSION,
     DemoAuthorityListResponse,
@@ -37,8 +37,16 @@ from backend.models import (
     ReportMode,
     ReportRecord,
     ReportStatus,
+    SafezoneNode,
+    SafezonesListResponse,
+    SafezoneToggleRequest,
     ScoreResult,
     SessionResponse,
+)
+from backend.routing import (
+    build_safezone_nodes,
+    compute_safe_route,
+    load_antalya_graph,
 )
 
 BROWSER_COOKIE_NAME = "heatnode_browser_id"
@@ -145,6 +153,16 @@ def health_check() -> Dict[str, Any]:
         "service": "cop31-heatnode",
         "model_version": DEFAULT_MODEL_VERSION,
         "ml_active": is_ml_available(),
+        "ml_metadata": get_ml_metadata(),
+    }
+
+
+@app.get("/api/model-info")
+def model_info() -> Dict[str, Any]:
+    """Return measured ML validation metrics, data sources, and model limitations."""
+    return {
+        "model_version": DEFAULT_MODEL_VERSION,
+        **get_ml_metadata(),
     }
 
 
@@ -306,6 +324,16 @@ def _build_map_response(
             model_version = model_out.model_version
             model_parameters = model_out.parameters
 
+    active_safezone_ids = db.get_active_safezone_ids()
+    all_safezone_nodes = build_safezone_nodes(active_safezone_ids, all_events)
+    active_safezones = [n for n in all_safezone_nodes if n.is_active]
+    safe_route = compute_safe_route(
+        user_lat=q_lat,
+        user_lng=q_lng,
+        active_safezone_ids=active_safezone_ids,
+        events=all_events,
+    )
+
     return MapQueryResponse(
         query_lat=q_lat,
         query_lng=q_lng,
@@ -318,6 +346,8 @@ def _build_map_response(
         active_reports=nearby_reports,
         events=nearby_events,
         heatmap_points=heatmap_points,
+        safezones=active_safezones,
+        safe_route=safe_route,
         calculated_at=now,
     )
 
@@ -327,7 +357,9 @@ def _build_demo_authority_response(limit: int) -> DemoAuthorityListResponse:
     db.init_db()
     now = utc_now()
     records = db.list_demo_authority_records(limit=limit)
-    all_reports, _ = db.get_active_reports_and_events(now=now)
+    all_reports, all_events = db.get_active_reports_and_events(now=now)
+    active_safezone_ids = db.get_active_safezone_ids()
+    safezone_nodes = build_safezone_nodes(active_safezone_ids, all_events)
     reports_by_event: Dict[str, List[ReportRecord]] = defaultdict(list)
     for r in all_reports:
         reports_by_event[r.event_id].append(r)
@@ -366,6 +398,7 @@ def _build_demo_authority_response(limit: int) -> DemoAuthorityListResponse:
     return DemoAuthorityListResponse(
         is_demo=True,
         records=enriched,
+        nodes=safezone_nodes,
     )
 
 
@@ -447,6 +480,45 @@ async def stream_map_data(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.get("/api/safezones", response_model=SafezonesListResponse)
+def list_safezones() -> SafezonesListResponse:
+    """List all Antalya intersection nodes with their safezone and hazard status."""
+    db.init_db()
+    now = utc_now()
+    _, all_events = db.get_active_reports_and_events(now=now)
+    active_ids = db.get_active_safezone_ids()
+    return SafezonesListResponse(nodes=build_safezone_nodes(active_ids, all_events))
+
+
+@app.post("/api/safezones/{node_id}/toggle", response_model=SafezoneNode)
+def toggle_safezone(
+    node_id: str,
+    payload: Optional[SafezoneToggleRequest] = Body(default=None),
+) -> SafezoneNode:
+    """Activate or deactivate an Antalya intersection node as an evacuation safezone."""
+    db.init_db()
+    graph_nodes, _ = load_antalya_graph()
+    if node_id not in graph_nodes:
+        raise HTTPException(status_code=404, detail=f"Unknown safezone node: {node_id}")
+
+    active_ids = db.get_active_safezone_ids()
+    next_active = (
+        payload.is_active
+        if payload is not None and payload.is_active is not None
+        else (node_id not in active_ids)
+    )
+    db.set_safezone_active(node_id, next_active)
+    _notify_subscribers()
+
+    now = utc_now()
+    _, all_events = db.get_active_reports_and_events(now=now)
+    updated_ids = db.get_active_safezone_ids()
+    for node in build_safezone_nodes(updated_ids, all_events):
+        if node.node_id == node_id:
+            return node
+    raise HTTPException(status_code=404, detail=f"Unknown safezone node: {node_id}")
 
 
 @app.get("/api/demo-authority", response_model=DemoAuthorityListResponse)

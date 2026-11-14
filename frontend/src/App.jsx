@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  detectInitialLanguage,
   getTranslations,
   isRtlLanguage,
 } from "./i18n.js";
@@ -39,7 +38,28 @@ export default function App({ initialScreen = "S01", initialRoute }) {
     return "/";
   });
 
-  const [lang] = useState(() => detectInitialLanguage());
+  const [lang, setLang] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = window.localStorage.getItem("heatnode_lang");
+        if (saved === "tr" || saved === "en") return saved;
+      } catch {
+        // ignore storage errors
+      }
+    }
+    return "en";
+  });
+
+  function handleChangeLang(nextLang) {
+    setLang(nextLang);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem("heatnode_lang", nextLang);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
   const [screen, setScreen] = useState(initialScreen);
   const [location, setLocation] = useState(null);
   const [reportMode, setReportMode] = useState("normal");
@@ -125,6 +145,8 @@ export default function App({ initialScreen = "S01", initialRoute }) {
       >
         <DemoAuthorityPanel
           t={t}
+          lang={lang}
+          onChangeLang={handleChangeLang}
           onNavigateHome={() => navigateToRoute("/")}
         />
       </div>
@@ -146,6 +168,8 @@ export default function App({ initialScreen = "S01", initialRoute }) {
       {activeScreen === "S01" && (
         <S01LocationStart
           t={t}
+          lang={lang}
+          onChangeLang={handleChangeLang}
           onGpsSuccess={(lat, lng) => {
             setLocation({ lat, lng, source: "gps" });
             setScreen("S03");

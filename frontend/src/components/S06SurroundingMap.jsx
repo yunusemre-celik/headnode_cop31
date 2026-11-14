@@ -4,9 +4,10 @@ import {
   TileLayer,
   Circle,
   CircleMarker,
+  Polyline,
   Popup,
 } from "react-leaflet";
-import { Home } from "lucide-react";
+import { Home, Navigation, ShieldCheck } from "lucide-react";
 import { DISASTER_CODES } from "../i18n.js";
 import { DISASTER_META } from "./disasterMeta.js";
 import { subscribeMapStream } from "../api.js";
@@ -41,6 +42,8 @@ export default function S06SurroundingMap({ t, location, onMainChoice }) {
 
   const events = mapData?.events || [];
   const reports = mapData?.active_reports || [];
+  const safezones = mapData?.safezones || [];
+  const safeRoute = mapData?.safe_route || null;
 
   return (
     <div className="flex flex-col justify-between min-h-dvh p-4 sm:p-6 max-w-3xl mx-auto gap-3">
@@ -111,6 +114,43 @@ export default function S06SurroundingMap({ t, location, onMainChoice }) {
             ));
           })}
 
+          {/* Evacuation route polyline */}
+          {safeRoute?.waypoints?.length >= 2 && (
+            <Polyline
+              positions={safeRoute.waypoints}
+              pathOptions={{
+                color: safeRoute.status === "safe" ? "#10B981" : "#F59E0B",
+                weight: 5,
+                opacity: 0.9,
+                dashArray: safeRoute.status === "safe" ? undefined : "8 8",
+              }}
+            />
+          )}
+
+          {/* Active Safezones */}
+          {safezones.map((sz) => (
+            <CircleMarker
+              key={`sz-${sz.node_id}`}
+              center={[sz.lat, sz.lng]}
+              radius={9}
+              pathOptions={{
+                color: "#FFFFFF",
+                weight: 2.5,
+                fillColor: "#10B981",
+                fillOpacity: 1,
+              }}
+            >
+              <Popup>
+                <div className="text-slate-900 text-xs">
+                  <div className="font-bold text-emerald-700">
+                    {t.safezone_label || "Safezone"}: {sz.name}
+                  </div>
+                  <div className="text-slate-600">{sz.intersection_name}</div>
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
+
           {/* Individual active report points */}
           {reports.map((rep) => {
             const reportColor =
@@ -138,6 +178,45 @@ export default function S06SurroundingMap({ t, location, onMainChoice }) {
           })}
         </MapContainer>
       </div>
+
+      {/* Evacuation Route Banner */}
+      {safeRoute && (
+        <div
+          data-testid="safe-route-banner"
+          className={`rounded-2xl border p-3.5 flex flex-col gap-1.5 ${
+            safeRoute.status === "safe"
+              ? "bg-emerald-950/60 border-emerald-600 text-emerald-100"
+              : "bg-amber-950/60 border-amber-500 text-amber-100"
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-bold text-sm">
+              <ShieldCheck className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>
+                {t.safezone_route_title || "Safe Evacuation Route"}:{" "}
+                {safeRoute.target_safezone.name}
+              </span>
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-slate-900/80 text-xs font-mono font-semibold">
+              {safeRoute.total_distance_km} km
+            </span>
+          </div>
+          <div className="text-xs opacity-90">
+            {safeRoute.status === "safe"
+              ? t.safezone_route_safe || "Avoids all active hazard zones"
+              : t.safezone_route_risky ||
+                "Warning: All paths cross hazards; lowest-risk route shown"}
+          </div>
+          {safeRoute.steps?.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs font-medium pt-0.5 flex-wrap">
+              <Navigation className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {safeRoute.steps.map((s) => s.name).join(" → ")}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Compact color legend */}
       <div

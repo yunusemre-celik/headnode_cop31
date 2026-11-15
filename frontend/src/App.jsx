@@ -11,6 +11,13 @@ import S04DisasterSelection from "./components/S04DisasterSelection.jsx";
 import S05SubmitResult from "./components/S05SubmitResult.jsx";
 import S06SurroundingMap from "./components/S06SurroundingMap.jsx";
 import DemoAuthorityPanel from "./components/DemoAuthorityPanel.jsx";
+import LandingPage from "./components/landing/LandingPage.jsx";
+
+function getRouteFromPath(pathname) {
+  if (pathname === "/app") return "/app";
+  if (pathname === "/demo-authority") return "/demo-authority";
+  return "/";
+}
 
 function hasValidLocation(loc) {
   return (
@@ -29,11 +36,9 @@ function hasValidLocation(loc) {
 
 export default function App({ initialScreen = "S01", initialRoute }) {
   const [route, setRoute] = useState(() => {
-    if (initialRoute) return initialRoute;
+    if (initialRoute) return getRouteFromPath(initialRoute);
     if (typeof window !== "undefined") {
-      return window.location.pathname === "/demo-authority"
-        ? "/demo-authority"
-        : "/";
+      return getRouteFromPath(window.location.pathname);
     }
     return "/";
   });
@@ -84,20 +89,17 @@ export default function App({ initialScreen = "S01", initialRoute }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onPopState = () => {
-      setRoute(
-        window.location.pathname === "/demo-authority"
-          ? "/demo-authority"
-          : "/"
-      );
+      setRoute(getRouteFromPath(window.location.pathname));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   function navigateToRoute(nextRoute) {
-    setRoute(nextRoute);
+    const normalized = getRouteFromPath(nextRoute);
+    setRoute(normalized);
     if (typeof window !== "undefined" && window.history?.pushState) {
-      window.history.pushState({}, "", nextRoute);
+      window.history.pushState({}, "", normalized);
     }
   }
 
@@ -150,6 +152,17 @@ export default function App({ initialScreen = "S01", initialRoute }) {
           onNavigateHome={() => navigateToRoute("/")}
         />
       </div>
+    );
+  }
+
+  if (route === "/") {
+    return (
+      <LandingPage
+        lang={lang}
+        onChangeLang={handleChangeLang}
+        onOpenApp={() => navigateToRoute("/app")}
+        onOpenAuthority={() => navigateToRoute("/demo-authority")}
+      />
     );
   }
 

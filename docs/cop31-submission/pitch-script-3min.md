@@ -1,76 +1,31 @@
-# HEATNODE AI — 3-Minute COP31 Jury Pitch Script
+# Heat Node — 3-Minute COP31 Pitch & Demo Video Script
 
 - **Target Duration:** 3:00 (180 seconds)
-- **Spoken Word Count:** ~435 words (~145 words/minute — natural, clear conference pace)
-- **Format:** English live pitch + live/recorded prototype demonstration
-- **Backup Plan:** If venue Wi-Fi drops, run locally (`uvicorn` + `vite`) using `data/fallback_weather.json` or play the pre-recorded 60-second demo video during `01:00–02:15`.
+- **Language:** English
+- **Live URL:** https://heatnode-cop31.vercel.app/
+- **Backup Plan:** Play the 60–90s recorded `.mp4` demo video embedded in Slide 5 if venue Wi-Fi drops.
 
 ---
 
-## Spoken Script & Second-by-Second Demo Choreography
-
-### 00:00 – 00:35 | The Climate Problem & Dual Beneficiaries (~80 words)
-
-**[Visual: Slide 1–2 — Antalya 45°C heatwave map + Kepez/Muratpaşa vulnerability contrast]**
-
-> "Every summer, Antalya's urban core faces extreme heatwaves exceeding 45 degrees Celsius—and climate change is making them longer and deadlier. Yet heat risk isn't uniform: dense, low-canopy neighborhoods in **Kepez** trap heat hours longer than coastal districts, and wind carries that thermal stress downwind into **Muratpaşa**.
+## 0:00 – 0:35 | Climate Problem, Evidence & Dual Users (Slides 1–3)
+> "This past summer, extreme heatwaves across Europe caused thousands of preventable deaths—proving that urban climate disasters hit dense neighborhoods hardest. And in Mediterranean cities like COP31 host **Antalya**, extreme heat and wildfires are now compounded by flash floods, hail, storms, and landslides.
 >
-> **HEATNODE AI** is a zero-hardware, privacy-first Urban Heat Crisis Twin built for two beneficiaries: **Antalya Metropolitan Municipality and AFAD crisis managers** who need early operational clarity, and **vulnerable residents in Kepez and Muratpaşa** who need safe, actionable guidance."
+> Yet cities lack block-level visibility without expensive IoT sensors, and residents lack safe evacuation routes. That's why we built **Heat Node**—a zero-hardware, no-login **10-hazard Multi-Disaster Urban Crisis Twin** for both vulnerable residents and municipal crisis managers."
 
----
-
-### 00:35 – 01:05 | Architecture & Prior Work vs. Hackathon Additions (~75 words)
-
-**[Visual: Slide 3 — 3-Stage AI Pipeline + Zero-PII Badge]**
-
-> "Traditional IoT sensor networks cost millions. Instead, HEATNODE AI fuses free Open-Meteo weather data with anonymous, **zero-PII** neighborhood reports—no GPS, no logins, no IP logging.
+## 0:35 – 1:15 | AI Approach & Data Sources (Slide 4)
+> "How does Heat Node turn crowd reports into reliable action without false-alarm panic?
 >
-> Our core 3-stage AI pipeline—built prior to this weekend—combines **DBSCAN and Isolation Forest** for anomaly verification, **XGBoost with SHAP** for 1-to-3-hour wind-advection forecasting, and **Weighted K-Means** for mobile cooling hub placement. During the **14–15 November hackathon**, we added **risk-aware safezone routing**, a **live multi-disaster map**, an **AI Model & Limitations transparency panel**, and this **English jury workflow**."
+> First, **Isolation Forest** and spatiotemporal clustering filter out isolated noise and duplicate spam within a 500-meter radius. Second, an **XGBoost** model trained on 5 years of Open-Meteo Antalya weather predicts 1-to-3-hour hazard propagation, reaching **R² 0.99 at +1h** and **0.94 at +3h** on physics-proxy labels. Third, our **risk-aware Dijkstra router** computes evacuation paths across Antalya's 24-node neighborhood graph that actively detour around 500-meter hazard zones."
 
----
+## 1:15 – 2:15 | Live / Recorded Prototype Walkthrough (Slide 5)
+*[Action: Open https://heatnode-cop31.vercel.app/ — or play embedded demo video]*
+> "Let's see it live. Notice there is **no login or account required**.
+> 1. **0:00–0:15:** A resident can allow optional GPS or pick their location manually on the map.
+> 2. **0:15–0:30:** They choose **Emergency** or **Normal** mode and report any of **10 climate hazards**—let's submit **Extreme Heat**.
+> 3. **0:30–0:45:** Immediately, the **Surrounding Map** displays the 500-meter hazard zone, the AI risk score, and a **green risk-aware evacuation route** leading to the nearest active safezone.
+> 4. **0:45–1:00:** In the **Demo Authority** panel, municipal operators can toggle safezones and watch citizen routes update in real time via Server-Sent Events—and inspect our **AI Model & Limitations** modal for full transparency."
 
-### 01:05 – 02:15 | Live / Recorded Prototype Demonstration (~175 words)
-
-* **01:05 – 01:20 | Step 1: Baseline & Surge Injection**
-  * **Demo Action:** Start on **Citizen View** (English default, status `Monitoring — No Active Emergency Alert`). Click **"Simulate Crowd Surge"** in the top bar.
-  * **Spoken:**
-    > "Let's see it live. Right now, Antalya's 24-node neighborhood graph is in baseline monitoring. I'll trigger a simulated 45-degree heatwave surge—injecting 42 anonymous reports across Kepez."
-
-* **01:20 – 01:40 | Step 2: Anomaly Verification, Propagation & SHAP**
-  * **Demo Action:** Switch to **Crisis Console**. Point to `PENDING_APPROVAL` badge. Toggle **+1h → +2h → +3h** horizon tabs to show directional wind-advection arrows moving from Kepez into Muratpaşa. Click `kepez_dokuma` to open the **SHAP Physical Drivers** bar chart.
-  * **Spoken:**
-    > "Switching to the Crisis Console, DBSCAN and Isolation Forest confirm a verified micro-climate anomaly, moving the system to `PENDING_APPROVAL`—notice citizens aren't panicked yet. Scrubbing **+1h to +3h**, XGBoost predicts thermal hazard propagating downwind into Muratpaşa, while SHAP explains *why*: wind vector alignment, urban heat retention, and report burst density."
-
-* **01:40 – 02:00 | Step 3: Safezone Toggle & Human-in-the-Loop Approval**
-  * **Demo Action:** Open the **Safezones / Demo Authority** panel, toggle an active safezone (e.g., `muratpasa_kaleici` or `kepez_dokuma`), set Hub Count `K=3`, and click **"Approve & Activate Public Alert"**.
-  * **Spoken:**
-    > "Crisis managers toggle safezone intersections, review Weighted K-Means cooling hub placements, and click **Approve & Activate**—keeping a human in the loop."
-
-* **02:00 – 02:15 | Step 4: Citizen Risk-Aware Evacuation Routing**
-  * **Demo Action:** Switch back to **Citizen View** (or **Surrounding Map**). Show the red **ACTIVE HEAT EMERGENCY ALERT** banner, nearest cooling hub card, and the green evacuation polyline routing *around* the 500-meter hazard circle.
-  * **Spoken:**
-    > "Instantly, Citizen View publishes the alert, displays the nearest cooling hub, and draws a **risk-aware Dijkstra evacuation route** that detours around active 500-meter hazard zones."
-
----
-
-### 02:15 – 02:40 | Measured Results vs. Limitations & Transparency (~65 words)
-
-**[Visual: Open the "AI Model & Limitations" modal briefly, or switch to Slide 6]**
-
-> "We also built an **AI Model & Limitations** panel right into the console. On 5 years of Antalya hourly weather, our XGBoost model achieves **R² 0.99 at +1h** and **0.94 at +3h** on physics-proxy risk labels—verified by automated backend and frontend test suites and an offline weather fallback. Crucially, we disclose that these are *physics proxies*, not clinical outcomes."
-
----
-
-### 02:40 – 03:00 | Expected Impact, Next Pilot & Close (~40 words)
-
-**[Visual: Slide 7 — Roadmap & Antalya Pilot Partners]**
-
-> "Our next step is a live pilot with **Antalya Metropolitan Municipality (AKOM)** and **MGM**, integrating **112 emergency and hospital heatstroke records** to turn measured model accuracy into real-world reduced heat-stress exposure. Thank you—we're ready for your questions."
-
----
-
-## Timing & Delivery Checklist
-- [ ] Rehearse with a stopwatch twice; target **02:50–02:58** to leave a 2-second buffer before the 3:00 bell.
-- [ ] Pre-load browser tabs: App (Citizen View / Crisis Console) + PDF backup of slides.
-- [ ] Verify default UI language is **English (`en`)** before stepping on stage.
-- [ ] Keep the 60-second recorded demo MP4 ready on desktop in case live internet fails.
+## 2:15 – 3:00 | Hackathon Build, Limitations & Next Step (Slides 6–8)
+> "Everything you see—from the 24-node graph and 5-year XGBoost pipeline to the 10-hazard UI, safezone routing, and Vercel/Railway deployment—was built during this hackathon, with **36 automated tests passing**.
+>
+> We are transparent about our limitations: our model currently uses physics-proxy labels rather than clinical records. Our next validation step is a **shadow-mode pilot with Antalya Metropolitan Municipality (AKOM) and MGM**, calibrating against anonymized 112 emergency and hospital data to protect lives before the next heatwave hits. Thank you."

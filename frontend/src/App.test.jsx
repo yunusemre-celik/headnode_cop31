@@ -100,6 +100,7 @@ describe("Heatnode PWA Flow", () => {
 
   afterEach(() => {
     window.localStorage.removeItem("heatnode_lang");
+    window.history.replaceState({}, "", "/");
     Object.defineProperty(navigator, "language", {
       value: originalLang,
       configurable: true,
@@ -112,7 +113,7 @@ describe("Heatnode PWA Flow", () => {
   });
 
   it("defaults to English even when browser language is tr-TR and supports TR/EN switching", () => {
-    render(<App />);
+    render(<App initialRoute="/app" />);
     expect(screen.getByText("Allow location access")).toBeInTheDocument();
     expect(screen.queryByText("Go back")).not.toBeInTheDocument();
 
@@ -131,7 +132,7 @@ describe("Heatnode PWA Flow", () => {
       configurable: true,
     });
 
-    render(<App initialScreen="S03" />);
+    render(<App initialRoute="/app" initialScreen="S03" />);
     // Guarded: falls back to S01
     expect(screen.getByText("Allow location access")).toBeInTheDocument();
 
@@ -143,7 +144,7 @@ describe("Heatnode PWA Flow", () => {
   });
 
   it("supports S02 manual pin placement and renders essential navigation controls", async () => {
-    render(<App />);
+    render(<App initialRoute="/app" />);
     // S01: no BackButton, shows Zero-PII privacy note
     expect(screen.queryByText("Go back")).not.toBeInTheDocument();
     expect(screen.getByText(/Zero-PII/i)).toBeInTheDocument();
@@ -209,7 +210,7 @@ describe("Heatnode PWA Flow", () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
-    render(<App />);
+    render(<App initialRoute="/app" />);
     fireEvent.click(screen.getByText("Allow location access"));
 
     // Now on S03
@@ -260,7 +261,7 @@ describe("Heatnode PWA Flow", () => {
       configurable: true,
     });
 
-    render(<App />);
+    render(<App initialRoute="/app" />);
     fireEvent.click(screen.getByText("Allow location access"));
     fireEvent.click(
       screen.getByText("I want information about my surroundings")
@@ -406,7 +407,7 @@ describe("Heatnode PWA Flow", () => {
       return origFetch(url, opts);
     });
 
-    render(<App />);
+    render(<App initialRoute="/app" />);
     fireEvent.click(screen.getByText("Allow location access"));
     fireEvent.click(
       screen.getByText("I want information about my surroundings")
@@ -484,5 +485,61 @@ describe("Heatnode PWA Flow", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
+  });
+
+  it("renders LandingPage at '/' and falls back unknown paths to '/'", () => {
+    render(<App />);
+    expect(screen.getByText("HEATNODE AI")).toBeInTheDocument();
+    expect(
+      screen.getByText("Human cooperation, accelerated to machine speed.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Allow location access")).not.toBeInTheDocument();
+
+    const { unmount } = render(<App initialRoute="/non-existent-route" />);
+    expect(
+      screen.getAllByText("Human cooperation, accelerated to machine speed.").length
+    ).toBeGreaterThan(0);
+    unmount();
+  });
+
+  it("supports TR/EN language toggle on LandingPage and persists heatnode_lang", () => {
+    render(<App initialRoute="/" />);
+    expect(
+      screen.getByText("Human cooperation, accelerated to machine speed.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "TR" }));
+    expect(window.localStorage.getItem("heatnode_lang")).toBe("tr");
+    expect(
+      screen.getByText("İnsan iş birliği, makine hızında eyleme dönüşür.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "EN" }));
+    expect(window.localStorage.getItem("heatnode_lang")).toBe("en");
+    expect(
+      screen.getByText("Human cooperation, accelerated to machine speed.")
+    ).toBeInTheDocument();
+  });
+
+  it("navigates from LandingPage CTAs to '/app' and '/demo-authority'", () => {
+    const { unmount } = render(<App initialRoute="/" />);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Launch Citizen App \(\/app\)/i })[0]
+    );
+    expect(window.location.pathname).toBe("/app");
+    expect(screen.getByText("Allow location access")).toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState({}, "", "/");
+    render(<App initialRoute="/" />);
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: /Open Crisis Console \(\/demo-authority\)/i,
+      })[0]
+    );
+    expect(window.location.pathname).toBe("/demo-authority");
+    expect(
+      screen.getByText(/DEMO — NO REAL INSTITUTION NOTIFICATIONS/i)
+    ).toBeInTheDocument();
   });
 });

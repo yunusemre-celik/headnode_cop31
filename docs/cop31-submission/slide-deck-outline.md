@@ -1,112 +1,71 @@
-# HEATNODE AI — COP31 Pitch Slide Deck Outline (9 Slides)
+# Heat Node — COP31 Pitch Slide Deck Outline (8 Slides)
 
-- **Target Format:** `.pptx` (16:9 widescreen) + exported **`.pdf` backup**
-- **Design Direction:** High-contrast dark crisis-console aesthetic (`#0F172A` slate background, `#F97316` heat amber, `#10B981` safezone emerald, `#EF4444` hazard red), large ≥24pt body text, minimal bullet density.
-- **Judging Alignment:** Every criterion in the ATOX AI for Climate · COP31 rubric is explicitly mapped below:
-  - Climate Relevance & Potential Impact (**30%**)
-  - Innovation & Creativity (**20%**)
-  - AI Integration (**20%**)
-  - Prototype Execution (**20%**)
-  - Presentation & Pitch (**10%**)
+- **Target Format:** `.pptx` (16:9 widescreen — Gamma.app / PowerPoint / Beamer) + **`.pdf` backup**
+- **Language:** English | **Target Pitch Duration:** 3:00 (including prototype demo)
+- **Design Direction:** Graphite Dark crisis-console aesthetic (`#0f0f10` background, `#4cc38a` safezone emerald, `#ef4444` hazard red, `#f97316` heat amber), large ≥24pt text, minimal bullet density.
 
 ---
 
-## Slide 1 — Title & Hook
-- **Criterion:** Presentation & Pitch (10%) | **Time:** 00:00–00:10
-- **Headline:** **HEATNODE AI: Antalya COP31 Urban Heat Crisis Twin**
-- **Subhead:** Zero-Hardware, Privacy-Preserving Early Warning & Risk-Aware Safezone Routing
-- **Visual Placeholder:** `[Screenshot: Dark-mode Antalya GIS Crisis Console showing 24-node graph & propagation vectors]`
-- **Talking Points:**
-  - Built for Antalya's 45°C+ urban heatwaves at COP31.
-  - Zero physical sensors, zero PII, human-in-the-loop municipal control.
+## Slide 1 — Title & Hook (0:00–0:15)
+- **Headline:** **Heat Node: Zero-Hardware Multi-Disaster Urban Crisis Twin**
+- **Subhead:** From Europe's Deadly Heatwaves to Antalya's 10-Hazard Resilience at COP31
+- **Footer:** Team Heat Node | COP31 AI for Climate Youth Hackathon
+- **Visual:** `[Screenshot: Live Graphite Dark Map showing active hazard zone & green safezone evacuation route]`
 
----
+## Slide 2 — The Climate Problem & Evidence (0:15–0:35)
+- **Weight:** Climate Relevance & Potential Impact (**30%**)
+- **Headline:** **Deadly Heatwaves & Compounding Urban Disasters**
+- **Key Points:**
+  - **Evidence:** Recent European summers caused tens of thousands of heat-related deaths (WHO / Lancet Countdown), exposing how urban heat islands disproportionately harm dense, low-canopy neighborhoods.
+  - **Compounding Extremes:** Mediterranean cities like Antalya face 45°C+ extreme heat and wildfires alongside flash floods, inundation, storms, hail, and landslides.
+  - **The Gap:** Physical IoT sensor networks are too expensive; residents lack safe, hazard-aware evacuation guidance.
 
-## Slide 2 — The Climate Problem & Dual Beneficiaries
-- **Criterion:** Climate Relevance & Potential Impact (30%) | **Time:** 00:10–00:35
-- **Headline:** **Extreme Urban Heat Hits Unequally — And Moves Downwind**
-- **Visual Placeholder:** `[Diagram: Kepez (10 dense, low-canopy nodes) --SW wind advection--> Muratpaşa (8 commercial core nodes) vs. Konyaaltı (6 coastal nodes)]`
-- **Dual Beneficiary Split (2-Column Card):**
-  1. **Municipal Crisis Managers (Antalya Metropolitan Municipality / AKOM & AFAD):** Need 1–3 hour neighborhood-level foresight, explainable alerts, and dynamic mobile cooling hub placement without false-alarm panic.
-  2. **Vulnerable Residents (Kepez & Muratpaşa):** Need 1-tap anonymous reporting (no login/GPS) and hazard-avoiding routes to active safezones.
+## Slide 3 — Target Users & Dual-Beneficiary Solution (0:35–0:55)
+- **Weight:** Climate Relevance (**30%**) + Innovation (**20%**)
+- **Headline:** **Two Users. Zero Hardware. Zero Accounts.**
+- **2-Column Card:**
+  1. **Citizens & Vulnerable Residents:** 1-tap anonymous reporting across **10 climate hazards**, optional GPS or manual map pin, and live safezone evacuation routes.
+  2. **Municipal Crisis Managers (AKOM / AFAD):** Anomaly-filtered situational awareness, 1–3h AI propagation risk, and live safezone activation controls.
 
----
+## Slide 4 — AI Architecture, Models & Data Sources (0:55–1:20)
+- **Weight:** AI Integration (**20%**)
+- **Headline:** **3-Stage AI + Risk-Aware Graph Routing**
+- **Pipeline Visual:**
+  1. **Anomaly Filtering (`IsolationForest` + Spatiotemporal Clustering):** Filters isolated noise/spam within a 500 m radius and 30-min duplicate window.
+  2. **1–3h Propagation (`XGBoost`):** Trained on 5 years of Open-Meteo Antalya hourly weather (`2021–2026`); achieves **+1h R² = 0.9905**, **+3h R² = 0.9387** on physics-proxy labels.
+  3. **Safezone Evacuation (`Risk-Aware Dijkstra`):** Routes citizens across the 24-node / 92-edge graph *around* active 500 m hazard circles.
+- **Data Sources:** Open-Meteo API (+ offline fallback), 24-node Antalya graph, OpenStreetMap/CartoDB, anonymous `heatnode_browser_id` reports.
 
-## Slide 3 — Innovation: Zero-Hardware, Zero-PII & Human-in-the-Loop
-- **Criterion:** Innovation & Creativity (20%) | **Time:** 00:35–00:50
-- **Headline:** **No IoT Sensors. No GPS Tracking. No Unverified Panic.**
-- **Visual Placeholder:** `[3-Icon Architecture Strip: Open-Meteo Free API + Node-Only SQLite Schema (node_id, category, created_at) + State Machine: MONITORING -> PENDING_APPROVAL -> ACTIVE]`
-- **Talking Points:**
-  - **Zero-Hardware:** Replaces costly urban sensor grids with free Open-Meteo weather + 24-node neighborhood graph (92 directed edges).
-  - **KVKK / GDPR Zero-PII:** Never requests browser geolocation, accounts, or IP logs.
-  - **Human-in-the-Loop (HITL) Gating:** Algorithms flag `PENDING_APPROVAL`; public alerts and safezone routing activate *only* after municipal operator sign-off.
+## Slide 5 — Live / Recorded Prototype Demo (1:20–2:15)
+- **Weight:** Prototype Execution (**20%**)
+- **Headline:** **Live Walkthrough: Report → AI Risk → Safezone Evacuation**
+- **Visual:** `[Embedded 60–90s Demo Video MP4 + Live URL: https://heatnode-cop31.vercel.app/]`
+- **4 Demo Steps:**
+  1. Open app (no login) → select manual location (`S01`–`S02`).
+  2. Pick Emergency + select from 10 climate hazards (`S03`–`S04`).
+  3. View live 500 m hazard map, ML propagation score & green Dijkstra evacuation route (`S05`–`S06`).
+  4. Toggle a safezone in Demo Authority → watch SSE update the route live; open AI Transparency modal.
 
----
+## Slide 6 — Built During the Hackathon (13–15 Nov 2026) (2:15–2:30)
+- **Headline:** **100% Built During the COP31 Hackathon Sprint**
+- **4-Step Timeline:**
+  - **Step 1 (13 Nov):** 24-node / 92-edge Antalya graph + 5-year Open-Meteo & UTCI pipeline.
+  - **Step 2 (13–14 Nov):** `IsolationForest` + `XGBoost` ML pipeline + FastAPI/SQLite/SSE backend.
+  - **Step 3 (14 Nov):** 10-disaster flow, risk-aware Dijkstra safezone router & AI Transparency modal.
+  - **Step 4 (15 Nov):** Graphite Dark UI modernization, Vercel + Railway deployment, 36/36 automated tests passing.
 
-## Slide 4 — AI Integration: 3-Stage Explainable ML Pipeline
-- **Criterion:** AI Integration (20%) | **Time:** 00:50–01:05
-- **Headline:** **From Crowd Noise to Physics-Grounded Forecasts & Routing**
-- **Visual Placeholder:** `[Pipeline Flowchart: Stage 1 (DBSCAN + Isolation Forest) -> Stage 2 (XGBoost + SHAP) -> Stage 3 (Weighted K-Means) -> Hackathon Addition (Risk-Aware Dijkstra)]`
-- **Talking Points:**
-  - **Stage 1 — Anomaly Verification:** DBSCAN ($\ge 10$ reports / 20 min) + Isolation Forest filters isolated noise from real micro-climate bursts.
-  - **Stage 2 — Propagation Forecasting:** XGBoost predicts +1h/+2h/+3h risk using 11 features (UTCI, thermal gradients, wind-vector alignment); SHAP explains drivers per node.
-  - **Stage 3 — Resource & Route Optimization:** Weighted K-Means places $K=1\dots5$ cooling hubs; **risk-aware Dijkstra** routes citizens around 500 m hazard circles.
+## Slide 7 — Evidence, Limitations & Responsible AI (2:30–2:45)
+- **Weight:** AI Integration (**20%**) + Climate Impact (**30%**)
+- **Measured Validation:** 25/25 backend `pytest` + 11/11 frontend `vitest` passing; live 200 OK on Vercel & Railway; offline weather fallback verified.
+- **Explicit Limitations:**
+  - Training uses **physics-proxy labels**, not clinical 112/hospital records.
+  - Live inference uses characteristic disaster weather profiles without physical street sensors.
+  - Modeled on Antalya's 24-node urban topology.
 
----
-
-## Slide 5 — Prior Work vs. 14–15 Nov Hackathon Additions (Transparency Disclosure)
-- **Criterion:** Hackathon Rule Compliance & Prototype Execution (20%) | **Time:** 01:05–01:15 (brief callout before live demo)
-- **Headline:** **Clear Attribution: Core Twin vs. Hackathon Sprint**
-- **Comparison Table:**
-  | Component | Built Prior to 14–15 Nov | Built During 14–15 Nov Hackathon |
-  | :--- | :--- | :--- |
-  | **Core Graph & ML** | 24-node / 92-edge Antalya graph, DBSCAN+IF, XGBoost+SHAP, K-Means | — |
-  | **Privacy & Ops** | Zero-PII SQLite DB, HITL alert state machine, offline weather fallback | — |
-  | **Evacuation & Maps** | Static nearest-hub assignment | **Risk-aware Dijkstra safezone routing** (500 m hazard avoidance) + **live multi-disaster map** |
-  | **Jury & Governance** | Basic Turkish/English UI | **AI Model & Limitations transparency modal** + **English-first COP31 jury flow** |
-
----
-
-## Slide 6 — Live / Recorded Prototype Demonstration
-- **Criterion:** Prototype Execution (20%) | **Time:** 01:15–02:15
-- **Headline:** **Live Twin Walkthrough: Surge → Forecast → Approve → Evacuate**
-- **Visual Placeholder:** `[Full-bleed Live Browser Window OR Embedded 60s Recorded Demo MP4]`
-- **4-Step Demo Checkpoints:**
-  1. **Simulate Surge:** 42 anonymous Kepez reports injected under 45°C SW wind.
-  2. **Inspect AI:** `PENDING_APPROVAL` state, +1h/+2h/+3h propagation vectors into Muratpaşa, SHAP driver breakdown.
-  3. **Operator Action:** Toggle active safezones, set $K=3$ cooling hubs, click **Approve & Activate**.
-  4. **Citizen Outcome:** Active alert banner + nearest hub card + green safezone evacuation polyline avoiding 500 m hazard circles.
-
----
-
-## Slide 7 — Measured Results vs. Expected Impact
-- **Criterion:** Climate Relevance & Potential Impact (30%) & AI Integration (20%) | **Time:** 02:15–02:40
-- **Headline:** **What We Measured Today vs. What We Aim to Achieve**
-- **Comparison Table:**
-  | Category | Status | Concrete Evidence / Target |
-  | :--- | :--- | :--- |
-  | **XGBoost Validation** | **Measured** (Physics-Proxy Labels) | +1h: **R² 0.9905, RMSE 1.94** · +2h: **R² 0.9702, RMSE 3.41** · +3h: **R² 0.9387, RMSE 4.84** |
-  | **Software Reliability** | **Measured** | Automated backend `pytest` & frontend `vitest` + `vite build` passing; zero-PII schema verified |
-  | **Offline Resilience** | **Measured** | Automatic Open-Meteo fallback (`data/fallback_weather.json`) + self-contained graph routing |
-  | **Heat-Stress Reduction** | **Expected Impact** (Unmeasured) | Faster mobile cooling hub dispatch in Kepez & Muratpaşa; reduced citizen exposure along evacuation routes |
-
----
-
-## Slide 8 — AI Limitations, Data Sources & Next Pilot Roadmap
-- **Criterion:** AI Integration (20%) & Climate Impact (30%) | **Time:** 02:40–02:55
-- **Headline:** **Honest Limitations & Path to Real Municipal Deployment**
-- **Visual Placeholder:** `[Screenshot: "AI Model & Limitations" modal in Crisis Console]`
-- **Talking Points:**
-  - **Data Sources:** Open-Meteo 5-year hourly weather (`2021–2026`), OpenStreetMap/CartoDB tiles, anonymous neighborhood-only reports.
-  - **Key Limitations:**
-    1. Trained on **physics-proxy risk labels**, not clinical heatstroke records.
-    2. **Neighborhood-centroid resolution** (Zero-PII trade-off vs. street-level GPS).
-  - **Next Pilot & Partners:** **Antalya Metropolitan Municipality (AKOM)** and **Turkish State Meteorological Service (MGM)** — integrating anonymized **112 emergency & hospital heatstroke records** to calibrate real-world health impact.
-
----
-
-## Slide 9 — Closing & Links
-- **Criterion:** Presentation & Pitch (10%) | **Time:** 02:55–03:00
-- **Headline:** **HEATNODE AI — Ready for Antalya. Ready for COP31.**
-- **Visual Placeholder:** `[QR Code to Live Prototype] | [GitHub Repo Link] | [Team / Contact]`
-- **Footer:** MIT License · Zero-Cost Render + Vercel Deployment · Offline Demo Ready
+## Slide 8 — Next Validation Step & Close (2:45–3:00)
+- **Headline:** **Next Step: Shadow-Mode Municipal Pilot in Antalya**
+- **Roadmap:**
+  1. Partner with **Antalya Metropolitan Municipality (AKOM)** & **MGM** for shadow-mode validation.
+  2. Calibrate XGBoost against anonymized **112 emergency & hospital heatstroke/disaster records**.
+  3. Expand neighborhood graph beyond Antalya to European & Mediterranean cities.
+- **Callout:** `https://heatnode-cop31.vercel.app/` | `github.com/yunusemre-celik/headnode_cop31` (MIT License)

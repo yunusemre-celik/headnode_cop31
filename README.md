@@ -31,7 +31,7 @@
 ## Key Features
 
 - **Zero-Hardware & Zero-Cost:** Requires no physical IoT sensor networks or paid APIs; uses free Open-Meteo weather data, OpenStreetMap/CartoDB tiles, SQLite, and free cloud hosting tiers.
-- **Strict Privacy (Zero-PII):** No GPS tracking, no citizen login/registration, and no IP logging. Citizens report solely by selecting their neighborhood.
+- **Privacy-First (No Accounts / No PII):** No citizen login, registration, name, email, or phone number required. Users can choose optional browser GPS or manual map/neighborhood selection; only an anonymous `heatnode_browser_id` UUID is used for anti-spam deduplication.
 - **3-Stage Explainable ML Pipeline:**
   1. **Stage 1 (Anomaly Detection):** DBSCAN spatial-temporal clustering + Isolation Forest meteorological anomaly verification.
   2. **Stage 2 (Predictive Forecasting):** XGBoost Regressor trained on 5 years of Antalya hourly weather, forecasting +1h, +2h, and +3h hazard propagation with SHAP physics-grounded feature attributions.
@@ -163,7 +163,7 @@ HEATNODE AI adheres to strict privacy-by-design principles:
 ### 1. Clone & Setup Backend
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/headnode_cop31.git
+git clone https://github.com/yunusemre-celik/headnode_cop31.git
 cd headnode_cop31
 
 # Install Python dependencies

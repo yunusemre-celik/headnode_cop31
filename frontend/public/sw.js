@@ -1,4 +1,4 @@
-const CACHE_NAME = "heatnode-shell-v2";
+const CACHE_NAME = "heatnode-shell-v3";
 const SHELL_ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

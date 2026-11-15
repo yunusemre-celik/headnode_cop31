@@ -141,7 +141,7 @@ export default function App({ initialScreen = "S01", initialRoute }) {
     return (
       <div
         dir={isRtl ? "rtl" : "ltr"}
-        className="min-h-dvh bg-slate-950 text-slate-100"
+        className="min-h-dvh bg-[#141415] text-[#ededed]"
       >
         <DemoAuthorityPanel
           t={t}
@@ -163,7 +163,7 @@ export default function App({ initialScreen = "S01", initialRoute }) {
   return (
     <main
       dir={isRtl ? "rtl" : "ltr"}
-      className="min-h-dvh bg-slate-950 text-slate-100"
+      className="min-h-dvh bg-[#141415] text-[#ededed]"
     >
       {activeScreen === "S01" && (
         <S01LocationStart

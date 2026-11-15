@@ -15,7 +15,7 @@ export default function AiTransparencyModal({ open, onClose, t }) {
 
   return (
     <div
-      className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] bg-[#0f0f10]/85 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
       data-testid="ai-transparency-backdrop"
     >
@@ -25,52 +25,52 @@ export default function AiTransparencyModal({ open, onClose, t }) {
         aria-labelledby="ai-transparency-title"
         data-testid="ai-transparency-modal"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[85dvh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 shadow-2xl p-5 sm:p-6 flex flex-col gap-5"
+        className="w-full max-w-2xl max-h-[85dvh] overflow-y-auto rounded-2xl bg-[#19191b] border border-[#ededed]/[0.14] text-[#ededed] p-5 sm:p-6 flex flex-col gap-5"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-3">
-          <h2 id="ai-transparency-title" className="text-lg font-bold text-white">
+        <div className="flex items-start justify-between gap-3 border-b border-[#ededed]/[0.08] pb-3">
+          <h2 id="ai-transparency-title" className="text-lg font-semibold text-[#ededed]">
             {t?.ai_modal_title || "AI Model, Data Sources & Limitations"}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label={t?.ai_modal_close || "Close"}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+            className="p-1.5 rounded-lg bg-[#232325] hover:bg-[#2c2c2f] border border-[#ededed]/[0.08] text-[#a1a1a6] hover:text-[#ededed] unslop-transition cursor-pointer"
           >
-            <X className="w-4 h-4" aria-hidden="true" />
+            <X className="w-4 h-4 stroke-[1.5]" strokeWidth={1.5} aria-hidden="true" />
           </button>
         </div>
 
         {/* 3-Stage AI Pipeline */}
         <section className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold text-sm uppercase tracking-wider">
-            <Cpu className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <div className="text-sm font-semibold text-[#ededed] flex items-center gap-2">
+            <Cpu className="w-4 h-4 shrink-0 text-[#4cc38a] stroke-[1.5]" strokeWidth={1.5} aria-hidden="true" />
             <span>{t?.ai_modal_stages_title || "3-Stage AI Pipeline"}</span>
           </div>
           <div className="grid grid-cols-1 gap-2 text-xs sm:text-sm">
-            <div className="rounded-xl bg-slate-800/70 border border-slate-700/80 p-3">
-              <div className="font-bold text-white">
+            <div className="rounded-xl bg-[#232325] border border-[#ededed]/[0.08] p-3">
+              <div className="font-semibold text-[#ededed]">
                 {t?.ai_modal_stage1_title || "1. DBSCAN + Isolation Forest"}
               </div>
-              <p className="text-slate-300 mt-0.5">
+              <p className="text-[#a1a1a6] mt-1">
                 {t?.ai_modal_stage1_desc ||
                   "Spatial-temporal clustering and anomaly verification to filter spoofed or isolated outlier reports."}
               </p>
             </div>
-            <div className="rounded-xl bg-slate-800/70 border border-slate-700/80 p-3">
-              <div className="font-bold text-white">
+            <div className="rounded-xl bg-[#232325] border border-[#ededed]/[0.08] p-3">
+              <div className="font-semibold text-[#ededed]">
                 {t?.ai_modal_stage2_title || "2. XGBoost + SHAP (1–3h Forecast)"}
               </div>
-              <p className="text-slate-300 mt-0.5">
+              <p className="text-[#a1a1a6] mt-1">
                 {t?.ai_modal_stage2_desc ||
                   "Multi-horizon (+1h, +2h, +3h) urban heat & hazard propagation risk forecast with SHAP feature attribution."}
               </p>
             </div>
-            <div className="rounded-xl bg-slate-800/70 border border-slate-700/80 p-3">
-              <div className="font-bold text-white">
+            <div className="rounded-xl bg-[#232325] border border-[#ededed]/[0.08] p-3">
+              <div className="font-semibold text-[#ededed]">
                 {t?.ai_modal_stage3_title || "3. Weighted K-Means + Safezone Routing"}
               </div>
-              <p className="text-slate-300 mt-0.5">
+              <p className="text-[#a1a1a6] mt-1">
                 {t?.ai_modal_stage3_desc ||
                   "Population-weighted cooling hub allocation and hazard-avoiding Dijkstra evacuation routing."}
               </p>
@@ -80,11 +80,11 @@ export default function AiTransparencyModal({ open, onClose, t }) {
 
         {/* Data Sources */}
         <section className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sky-400 font-semibold text-sm uppercase tracking-wider">
-            <Database className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <div className="text-sm font-semibold text-[#ededed] flex items-center gap-2">
+            <Database className="w-4 h-4 shrink-0 text-[#a1a1a6] stroke-[1.5]" strokeWidth={1.5} aria-hidden="true" />
             <span>{t?.ai_modal_sources_title || "Data Sources"}</span>
           </div>
-          <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-slate-300">
+          <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-[#a1a1a6]">
             <li>
               {t?.ai_modal_source1 ||
                 "Open-Meteo: Hourly weather & 5-year historical climate baseline."}
@@ -101,15 +101,15 @@ export default function AiTransparencyModal({ open, onClose, t }) {
         </section>
 
         {/* Limitations & Next Pilot Step */}
-        <section className="flex flex-col gap-2 rounded-xl bg-amber-950/40 border border-amber-700/60 p-3.5">
-          <div className="flex items-center gap-2 text-amber-300 font-semibold text-sm uppercase tracking-wider">
-            <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+        <section className="flex flex-col gap-2 rounded-xl bg-[#d97706]/10 border border-[#d97706]/30 p-3.5">
+          <div className="text-sm font-semibold text-[#ededed] flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#d97706] stroke-[1.5]" strokeWidth={1.5} aria-hidden="true" />
             <span>
               {t?.ai_modal_limits_title ||
                 "Explicit Limitations & Data Requirements"}
             </span>
           </div>
-          <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-amber-100/90">
+          <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-[#ededed]/90">
             <li>
               {t?.ai_modal_limit1 ||
                 "Trained on physics-proxy risk labels rather than municipal 112 / hospital heatstroke records."}
@@ -129,7 +129,7 @@ export default function AiTransparencyModal({ open, onClose, t }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-[#ededed] hover:bg-white text-[#141415] text-sm font-semibold unslop-transition cursor-pointer"
           >
             {t?.ai_modal_close || "Close"}
           </button>

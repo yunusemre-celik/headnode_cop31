@@ -5,11 +5,10 @@ export default function BackButton({ label, onClick, isRtl = false }) {
     <button
       type="button"
       onClick={onClick}
-      style={{ backgroundColor: "#4B5563" }}
-      className="w-full min-h-[56px] px-5 py-3.5 rounded-2xl text-white font-semibold text-base sm:text-lg flex items-center justify-center gap-3 shadow-md active:scale-[0.99] transition-transform cursor-pointer whitespace-normal break-words text-center"
+      className="w-full bg-[#232325] hover:bg-[#2c2c2f] border border-[#ededed]/[0.08] text-[#ededed] rounded-xl min-h-14 px-4 py-3 font-medium text-base flex items-center justify-center gap-2.5 active:scale-[0.98] unslop-transition cursor-pointer whitespace-normal break-words text-center"
     >
       <ArrowLeft
-        className={`w-5 h-5 shrink-0 ${isRtl ? "rotate-180" : ""}`}
+        className={`w-[18px] h-[18px] shrink-0 stroke-[1.5] ${isRtl ? "rotate-180" : ""}`}
         aria-hidden="true"
       />
       <span>{label}</span>

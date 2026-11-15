@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from "react-leaflet";
-import { Check, MapPin } from "lucide-react";
-import BackButton from "./BackButton.jsx";
+import { ArrowLeft, Check, MapPin } from "lucide-react";
 
 const DEFAULT_CENTER = [36.8969, 30.7133];
 
@@ -16,10 +15,10 @@ function PinSelector({ onPick }) {
 
 export default function S02ManualLocation({
   t,
-  initialLocation,
-  onConfirm,
-  onBack,
   isRtl = false,
+  initialLocation,
+  onBack,
+  onConfirm,
 }) {
   const [pin, setPin] = useState(
     initialLocation &&
@@ -33,9 +32,24 @@ export default function S02ManualLocation({
 
   return (
     <div className="flex flex-col justify-between min-h-dvh p-4 sm:p-6 max-w-2xl mx-auto gap-3">
-      <div className="flex items-center justify-center gap-2 text-[#a1a1a6] text-sm font-medium py-1">
-        <MapPin className="w-[18px] h-[18px] stroke-[1.5] text-[#dc2626] shrink-0" aria-hidden="true" />
-        <span>{t.s02_tap_hint}</span>
+      <div className="flex items-center justify-between gap-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-12 px-3.5 py-2 rounded-xl bg-[#232325] hover:bg-[#2c2c2f] border border-[#ededed]/[0.08] text-[#ededed] text-sm font-medium inline-flex items-center gap-2 cursor-pointer unslop-transition"
+          >
+            <ArrowLeft
+              className={`w-4 h-4 shrink-0 stroke-[1.5] ${isRtl ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+            <span>{t.back}</span>
+          </button>
+        )}
+        <div className="flex items-center justify-center gap-2 text-[#a1a1a6] text-sm font-medium py-1 flex-1">
+          <MapPin className="w-[18px] h-[18px] stroke-[1.5] text-[#dc2626] shrink-0" aria-hidden="true" />
+          <span>{t.s02_tap_hint}</span>
+        </div>
       </div>
 
       <div className="flex-1 min-h-80 rounded-2xl overflow-hidden border border-[#ededed]/[0.08] relative">
@@ -74,13 +88,6 @@ export default function S02ManualLocation({
           <Check className="w-5 h-5 shrink-0 stroke-[1.5]" aria-hidden="true" />
           <span>{t.s02_confirm_location}</span>
         </button>
-        {onBack && (
-          <BackButton
-            label={t.back || "Back"}
-            onClick={onBack}
-            isRtl={isRtl}
-          />
-        )}
       </div>
     </div>
   );

@@ -181,7 +181,9 @@ export default function App({ initialScreen = "S01", initialRoute }) {
       {activeScreen === "S02" && (
         <S02ManualLocation
           t={t}
+          isRtl={isRtl}
           initialLocation={location}
+          onBack={() => setScreen("S01")}
           onConfirm={(lat, lng) => {
             setLocation({ lat, lng, source: "manual" });
             setScreen("S03");
@@ -192,6 +194,8 @@ export default function App({ initialScreen = "S01", initialRoute }) {
       {activeScreen === "S03" && (
         <S03MainChoice
           t={t}
+          location={location}
+          onChangeLocation={() => setScreen("S01")}
           onEmergency={() => {
             setReportMode("emergency");
             setScreen("S04");
@@ -207,7 +211,10 @@ export default function App({ initialScreen = "S01", initialRoute }) {
       {activeScreen === "S04" && (
         <S04DisasterSelection
           t={t}
+          isRtl={isRtl}
+          reportMode={reportMode}
           submitting={submitting}
+          onBack={() => setScreen("S03")}
           onSelectDisaster={handleSelectDisaster}
         />
       )}

@@ -28,6 +28,11 @@ export default function S05SubmitResult({
             >
               <CheckCircle2 className="w-8 h-8 stroke-[1.5] text-[#4cc38a] shrink-0" aria-hidden="true" />
               <span>{t.s05_success}</span>
+              {t.s05_next_step && (
+                <p className="text-sm font-medium text-emerald-100">
+                  {t.s05_next_step}
+                </p>
+              )}
             </div>
 
             <button

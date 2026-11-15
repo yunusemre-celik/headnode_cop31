@@ -1,4 +1,4 @@
-import { AlertTriangle, Megaphone, Map, MapPin } from "lucide-react";
+import { AlertTriangle, Megaphone, Map, MapPin, RefreshCw } from "lucide-react";
 
 export default function S03MainChoice({
   t,
@@ -8,28 +8,27 @@ export default function S03MainChoice({
   onNormal,
   onMap,
 }) {
+  const locationLabel =
+    location?.source === "gps" ? t.s03_location_gps : t.s03_location_manual;
+
   return (
     <div className="flex flex-col justify-between min-h-dvh p-4 sm:p-6 max-w-md mx-auto gap-4">
-      {onChangeLocation && (
-        <div className="flex items-center justify-between bg-[#19191b] border border-[#ededed]/[0.08] rounded-xl px-4 py-2.5 text-xs text-[#a1a1a6]">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-3.5 h-3.5 text-[#dc2626] shrink-0" aria-hidden="true" />
-            <span className="font-mono-tabular">
-              {location && typeof location.lat === "number" && typeof location.lng === "number"
-                ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
-                : ""}
-            </span>
-          </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#19191b] border border-[#ededed]/[0.08] text-xs font-medium text-[#4cc38a]">
+          <MapPin className="w-3.5 h-3.5 shrink-0 stroke-[1.5]" aria-hidden="true" />
+          <span>{locationLabel}</span>
+        </div>
+        {onChangeLocation && (
           <button
             type="button"
             onClick={onChangeLocation}
-            className="text-xs text-[#ededed] hover:underline cursor-pointer font-medium"
+            className="min-h-12 px-3.5 py-2 rounded-xl bg-[#19191b] hover:bg-[#232325] border border-[#ededed]/[0.08] text-[#ededed] text-xs sm:text-sm font-medium inline-flex items-center gap-1.5 cursor-pointer unslop-transition"
           >
-            {t.change || "Change"}
+            <RefreshCw className="w-3.5 h-3.5 shrink-0 stroke-[1.5] text-[#a1a1a6]" aria-hidden="true" />
+            <span>{t.s03_change_location}</span>
           </button>
-        </div>
-      )}
-
+        )}
+      </div>
       <div className="flex-1 flex flex-col justify-center gap-4">
         <button
           type="button"

@@ -1,17 +1,43 @@
+import { ArrowLeft } from "lucide-react";
 import { DISASTER_CODES } from "../i18n.js";
 import { DISASTER_META } from "./disasterMeta.js";
-import BackButton from "./BackButton.jsx";
 
 export default function S04DisasterSelection({
   t,
-  submitting,
-  onSelectDisaster,
-  onBack,
   isRtl = false,
-  reportMode,
+  reportMode = "normal",
+  submitting,
+  onBack,
+  onSelectDisaster,
 }) {
+  const isEmergency = reportMode === "emergency";
+
   return (
     <div className="flex flex-col justify-between min-h-dvh p-4 sm:p-6 max-w-2xl mx-auto gap-4">
+      <div className="flex items-center justify-between gap-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-12 px-3.5 py-2 rounded-xl bg-[#232325] hover:bg-[#2c2c2f] border border-[#ededed]/[0.08] text-[#ededed] text-sm font-medium inline-flex items-center gap-2 cursor-pointer unslop-transition"
+          >
+            <ArrowLeft
+              className={`w-4 h-4 shrink-0 stroke-[1.5] ${isRtl ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            />
+            <span>{t.back}</span>
+          </button>
+        )}
+        <span
+          className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold border ${
+            isEmergency
+              ? "bg-red-950/80 border-red-700 text-red-200"
+              : "bg-orange-950/80 border-orange-700 text-orange-200"
+          }`}
+        >
+          {isEmergency ? t.mode_emergency : t.mode_normal}
+        </span>
+      </div>
       <div className="flex-1 flex flex-col justify-center">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {DISASTER_CODES.map((code) => {
@@ -47,15 +73,6 @@ export default function S04DisasterSelection({
           </p>
         )}
       </div>
-      {onBack && (
-        <div className="pt-2">
-          <BackButton
-            label={t.back || "Back"}
-            onClick={onBack}
-            isRtl={isRtl}
-          />
-        </div>
-      )}
     </div>
   );
 }

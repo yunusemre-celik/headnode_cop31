@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LocateFixed, MapPin } from "lucide-react";
+import { LocateFixed, MapPin, ShieldCheck } from "lucide-react";
 
 export default function S01LocationStart({
   t,
@@ -53,14 +53,14 @@ export default function S01LocationStart({
 
   return (
     <div className="flex flex-col justify-between min-h-dvh p-4 sm:p-6 max-w-md mx-auto gap-4">
-      <header className="flex items-center justify-between py-2">
+      <header className="flex items-center justify-between gap-2 py-2">
         <div className="flex items-center gap-2">
           <span
             className="w-1.5 h-1.5 rounded-full bg-[#4cc38a] shrink-0"
             aria-hidden="true"
           />
           <span className="font-semibold text-sm text-[#ededed] tracking-tight">
-            HEATNODE
+            {t.app_title || "HEATNODE AI · Antalya"}
           </span>
         </div>
         {onChangeLang && (
@@ -96,8 +96,13 @@ export default function S01LocationStart({
           </div>
         )}
       </header>
-
       <div className="flex-1 flex flex-col justify-center gap-4">
+        {t.s01_privacy_note && (
+          <div className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#19191b] border border-[#ededed]/[0.08] text-[#a1a1a6] text-xs sm:text-sm font-medium text-center">
+            <ShieldCheck className="w-4 h-4 shrink-0 text-[#4cc38a] stroke-[1.5]" aria-hidden="true" />
+            <span>{t.s01_privacy_note}</span>
+          </div>
+        )}
         <button
           type="button"
           onClick={handleAllowLocation}

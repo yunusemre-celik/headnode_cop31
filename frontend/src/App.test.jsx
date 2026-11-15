@@ -142,15 +142,16 @@ describe("Heatnode PWA Flow", () => {
     expect(screen.queryByText("Go back")).not.toBeInTheDocument();
   });
 
-  it("supports S02 manual pin placement and renders no BackButton on S01-S06", async () => {
+  it("supports S02 manual pin placement and renders essential navigation controls", async () => {
     render(<App />);
-    // S01: no BackButton
+    // S01: no BackButton, shows Zero-PII privacy note
     expect(screen.queryByText("Go back")).not.toBeInTheDocument();
+    expect(screen.getByText(/Zero-PII/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("I will choose my location manually"));
-    // S02: no BackButton
+    // S02: has Back button
     expect(screen.getByTestId("leaflet-map")).toBeInTheDocument();
-    expect(screen.queryByText("Go back")).not.toBeInTheDocument();
+    expect(screen.getByText("Go back")).toBeInTheDocument();
 
     const confirmBtn = screen.getByText("Confirm location").closest("button");
     expect(confirmBtn).toBeDisabled();
@@ -165,9 +166,10 @@ describe("Heatnode PWA Flow", () => {
     });
 
     fireEvent.click(confirmBtn);
-    // S03: no BackButton
+    // S03: shows location badge and Change location button
     expect(screen.getByText("I am in an emergency")).toBeInTheDocument();
-    expect(screen.queryByText("Go back")).not.toBeInTheDocument();
+    expect(screen.getByText("Location: Manual")).toBeInTheDocument();
+    expect(screen.getByText("Change location")).toBeInTheDocument();
   });
 
   it("submits report on S04 tap, shows confirmation on accepted, and reuses client_request_id on retry", async () => {
@@ -214,9 +216,10 @@ describe("Heatnode PWA Flow", () => {
     expect(screen.getByText("I am in an emergency")).toBeInTheDocument();
     fireEvent.click(screen.getByText("I am in an emergency"));
 
-    // Now on S04: all 10 disaster buttons rendered, no BackButton
-    expect(screen.getAllByRole("button").length).toBe(DISASTER_CODES.length);
-    expect(screen.queryByText("Go back")).not.toBeInTheDocument();
+    // Now on S04: all 10 disaster buttons + 1 Back button + Emergency mode badge
+    expect(screen.getAllByRole("button").length).toBe(DISASTER_CODES.length + 1);
+    expect(screen.getByText("Go back")).toBeInTheDocument();
+    expect(screen.getByText("Emergency")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Wildfire"));
 
     // Network failure -> S05 must NOT show confirmation, no BackButton

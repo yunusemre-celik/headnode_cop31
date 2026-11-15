@@ -1,0 +1,58 @@
+name: Uptime & Health Check
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-live-systems:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check Vercel Frontend & Railway Backend/ML
+        run: |
+          python3 - << 'EOF'
+          import json
+          import urllib.request
+
+          FRONTEND_URL = "https://heatnode-cop31.vercel.app/"
+          BACKEND_BASE = "https://heatnode-backend-production.up.railway.app"
+
+          def fetch(url, method="GET", headers=None):
+              req = urllib.request.Request(url, method=method, headers=headers or {})
+              with urllib.request.urlopen(req, timeout=20) as resp:
+                  return resp.status, dict(resp.headers), resp.read().decode("utf-8", errors="replace")
+
+          # 1. Vercel Frontend
+          status, _, _ = fetch(FRONTEND_URL)
+          assert status == 200, f"Frontend returned {status}"
+          print("OK: Vercel Frontend -> 200")
+
+          # 2. Railway Backend + ML Health
+          status, _, body = fetch(f"{BACKEND_BASE}/api/health")
+          assert status == 200, f"/api/health returned {status}"
+          health = json.loads(body)
+          assert health.get("status") == "ok", f"Unexpected health status: {health}"
+          assert health.get("ml_active") is True, f"ML model not active: {health}"
+          print(f"OK: Railway /api/health -> {health}")
+
+          # 3. Railway Core Map Endpoint
+          status, _, _ = fetch(f"{BACKEND_BASE}/api/map?lat=36.8969&lng=30.7133")
+          assert status == 200, f"/api/map returned {status}"
+          print("OK: Railway /api/map -> 200")
+
+          # 4. CORS Preflight Check for Vercel Origin
+          status, hdrs, _ = fetch(
+              f"{BACKEND_BASE}/api/health",
+              method="OPTIONS",
+              headers={
+                  "Origin": "https://heatnode-cop31.vercel.app",
+                  "Access-Control-Request-Method": "GET",
+              },
+          )
+          assert status == 200, f"CORS OPTIONS returned {status}"
+          allow_origin = {k.lower(): v for k, v in hdrs.items()}.get("access-control-allow-origin")
+          assert allow_origin == "https://heatnode-cop31.vercel.app", f"Unexpected CORS origin: {allow_origin}"
+          print(f"OK: CORS -> {allow_origin}")
+          EOF
